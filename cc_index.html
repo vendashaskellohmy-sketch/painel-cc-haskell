@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Conta Corrente · Haskell BI</title>
+
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Luxon (datas) -->
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+
+<style>
+/* ── Reset & tokens ─────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --verde:        #2d6a4f;
+  --verde-escuro: #1b4332;
+  --verde-claro:  #d8f3dc;
+  --verde-mid:    #52b788;
+  --branco:       #ffffff;
+  --cinza-bg:     #f8f9fa;
+  --cinza-borda:  #dee2e6;
+  --cinza-texto:  #6c757d;
+  --texto:        #212529;
+  --vermelho:     #c0392b;
+  --verde-pos:    #2d6a4f;
+  --radius:       10px;
+  --shadow:       0 2px 8px rgba(0,0,0,.1);
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--cinza-bg);
+  color: var(--texto);
+  min-height: 100vh;
+}
+
+/* ── Topbar ─────────────────────────────────────────── */
+.topbar {
+  background: var(--verde-escuro);
+  border-bottom: none;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 68px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+.topbar-logo {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--branco);
+  letter-spacing: .5px;
+  white-space: nowrap;
+}
+.topbar-logo span { color: rgba(255,255,255,.65); font-weight: 400; }
+.topbar-status {
+  margin-left: auto;
+  font-size: .75rem;
+  color: rgba(255,255,255,.65);
+}
+.topbar-status.ok  { color: #52b788; }
+.topbar-status.err { color: #ff7675; }
+
+/* ── Tabs ───────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0;
+  background: var(--branco);
+  border-bottom: 2px solid var(--cinza-borda);
+  padding: 0 24px;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--cinza-texto);
+  font-size: .9rem;
+  font-weight: 500;
+  padding: 12px 22px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.tab-btn:hover  { color: var(--verde); }
+.tab-btn.active { color: var(--verde-escuro); border-bottom-color: var(--verde); font-weight: 600; }
+
+/* ── Layout principal ───────────────────────────────── */
+.main { padding: 24px; max-width: 1600px; margin: 0 auto; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ── Filtros ────────────────────────────────────────── */
+.filter-bar {
+  background: var(--branco);
+  border: 1px solid var(--cinza-borda);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label { font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; color: var(--cinza-texto); font-weight: 500; }
+.filter-group select,
+.filter-group input {
+  background: var(--branco);
+  border: 1px solid var(--cinza-borda);
+  border-radius: 6px;
+  color: var(--texto);
+  padding: 6px 10px;
+  font-size: .85rem;
+  min-width: 160px;
+  height: 34px;
+}
+.filter-group select:focus,
+.filter-group input:focus {
+  outline: none;
+  border-color: var(--verde);
+}
+
+.btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  font-size: .85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s;
+  height: 34px;
+}
+.btn-primary { background: var(--verde); color: var(--branco); }
+.btn-primary:hover { background: var(--verde-escuro); }
+.btn-ghost   { background: var(--branco); color: var(--cinza-texto); border: 1px solid var(--cinza-borda); }
+.btn-ghost:hover { background: var(--verde-claro); border-color: var(--verde-mid); color: var(--verde-escuro); }
+
+/* ── KPI cards ──────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--branco);
+  border: 1px solid var(--cinza-borda);
+  border-left: 4px solid var(--verde-mid);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.kpi-label {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--cinza-texto);
+  margin-bottom: 6px;
+}
+.kpi-value {
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.kpi-value.pos  { color: var(--verde-escuro); }
+.kpi-value.neg  { color: var(--vermelho); }
+.kpi-value.neu  { color: var(--texto); }
+.kpi-value.pink { color: var(--verde); }
+.kpi-sub { font-size: .72rem; color: var(--cinza-texto); margin-top: 4px; }
+
+/* ── Gráficos ───────────────────────────────────────── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.chart-card {
+  background: var(--branco);
+  border: 1px solid var(--cinza-borda);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+.chart-card h3 {
+  font-size: .8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--cinza-texto);
+  margin-bottom: 16px;
+}
+.chart-wrap { position: relative; height: 260px; }
+
+/* ── Tabela de saldos ───────────────────────────────── */
+.saldo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+@media (max-width: 900px) { .saldo-grid { grid-template-columns: 1fr; } }
+
+.table-card {
+  background: var(--branco);
+  border: 1px solid var(--cinza-borda);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.table-card-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cinza-borda);
+  font-size: .8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--cinza-texto);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.badge {
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: .7rem;
+  font-weight: 600;
+}
+.badge-hk { background: var(--verde-claro); color: var(--verde-escuro); }
+.badge-om { background: #ede7f6; color: #5e35b1; }
+
+/* ── Tabela principal ───────────────────────────────── */
+.data-table-wrap {
+  background: var(--branco);
+  border: 1px solid var(--cinza-borda);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cinza-borda);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.table-toolbar h3 { font-size: .85rem; font-weight: 600; color: var(--texto); }
+.table-info { font-size: .75rem; background: var(--verde-claro); color: var(--verde-escuro); padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+
+.scroll-x { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+th {
+  background: var(--cinza-bg);
+  color: var(--cinza-texto);
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--cinza-borda);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+th:hover { color: var(--verde); }
+td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--cinza-borda);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+tr:hover td { background: #f0faf4; }
+tr:last-child td { border-bottom: none; }
+
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: .7rem;
+  font-weight: 600;
+}
+.pill-credito { background: var(--verde-claro); color: var(--verde-escuro); }
+.pill-debito  { background: #fde8e8; color: var(--vermelho); }
+.pill-hk      { background: var(--verde-claro); color: var(--verde-escuro); }
+.pill-om      { background: #ede7f6; color: #5e35b1; }
+
+.val-pos { color: var(--verde-escuro); font-weight: 600; }
+.val-neg { color: var(--vermelho);     font-weight: 600; }
+
+/* ── Paginação ──────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--cinza-borda);
+}
+.page-btn {
+  background: var(--branco);
+  border: 1px solid var(--cinza-borda);
+  color: var(--texto);
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: .8rem;
+  cursor: pointer;
+  min-width: 34px;
+}
+.page-btn:hover:not(:disabled)  { background: var(--verde-claro); border-color: var(--verde-mid); color: var(--verde-escuro); }
+.page-btn.active { background: var(--verde); color: #fff; border-color: var(--verde); font-weight: 600; }
+.page-btn:disabled { opacity: .4; cursor: default; }
+
+/* ── Loading ────────────────────────────────────────── */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--cinza-texto);
+  padding: 60px;
+  font-size: .9rem;
+}
+.spinner {
+  width: 22px; height: 22px;
+  border: 3px solid var(--cinza-borda);
+  border-top-color: var(--verde);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsivo ─────────────────────────────────────── */
+@media (max-width: 640px) {
+  .main { padding: 12px; }
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .charts-grid { grid-template-columns: 1fr; }
+  .filter-bar { gap: 8px; }
+  .filter-group select, .filter-group input { min-width: 130px; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- ── Topbar ─────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-logo">Haskell BI <span>· Conta Corrente</span></div>
+  <a href="https://haskellbi.com.br" style="margin-left:8px;font-size:.75rem;color:rgba(255,255,255,.6);text-decoration:none;">← Portal</a>
+  <div class="topbar-status" id="statusBar">Carregando…</div>
+</header>
+
+<!-- ── Tabs ───────────────────────────────────────────────── -->
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="visao">Visão Geral</button>
+  <button class="tab-btn"        data-tab="historico">Histórico de Lançamentos</button>
+  <button class="tab-btn"        data-tab="saldos">Saldos por Distribuidor</button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════
+     ABA 1 — VISÃO GERAL
+══════════════════════════════════════════════════════════ -->
+<div class="main">
+<div class="tab-pane active" id="tab-visao">
+
+  <!-- Filtros visão geral -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Empresa</label>
+      <select id="vg-empresa">
+        <option value="">Todas</option>
+        <option value="Haskell">Haskell</option>
+        <option value="OhMy!">OhMy!</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Regional</label>
+      <select id="vg-regional">
+        <option value="">Todas</option>
+        <option>Centro Oeste &amp; São Paulo</option>
+        <option>Sudeste &amp; Sul</option>
+        <option>Norte &amp; Nordeste</option>
+        <option>E-commerce</option>
+        <option>Exportação</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Período — Início</label>
+      <input type="month" id="vg-ini" />
+    </div>
+    <div class="filter-group">
+      <label>Período — Fim</label>
+      <input type="month" id="vg-fim" />
+    </div>
+    <button class="btn btn-primary" id="vg-aplicar">Aplicar</button>
+    <button class="btn btn-ghost"   id="vg-limpar">Limpar</button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="loading"><div class="spinner"></div> Carregando…</div>
+  </div>
+
+  <!-- Gráficos -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Créditos vs Débitos por mês</h3>
+      <div class="chart-wrap"><canvas id="chartMensal"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Saldo por Regional</h3>
+      <div class="chart-wrap"><canvas id="chartRegional"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Distribuição por Tipo de Crédito</h3>
+      <div class="chart-wrap"><canvas id="chartTipo"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Evolução do Saldo Acumulado</h3>
+      <div class="chart-wrap"><canvas id="chartSaldoAcum"></canvas></div>
+    </div>
+  </div>
+
+</div><!-- /tab-visao -->
+
+<!-- ══════════════════════════════════════════════════════════
+     ABA 2 — HISTÓRICO
+══════════════════════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-historico">
+
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Empresa</label>
+      <select id="h-empresa">
+        <option value="">Todas</option>
+        <option value="Haskell">Haskell</option>
+        <option value="OhMy!">OhMy!</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Regional</label>
+      <select id="h-regional">
+        <option value="">Todas</option>
+        <option>Centro Oeste &amp; São Paulo</option>
+        <option>Sudeste &amp; Sul</option>
+        <option>Norte &amp; Nordeste</option>
+        <option>E-commerce</option>
+        <option>Exportação</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Operação</label>
+      <select id="h-operacao">
+        <option value="">Todas</option>
+        <option value="Crédito">Crédito</option>
+        <option value="Débito">Débito</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Tipo de Crédito</label>
+      <select id="h-tipo"></select>
+    </div>
+    <div class="filter-group">
+      <label>Distribuidor</label>
+      <select id="h-distribuidor"><option value="">Todos</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Data Ref. — Início</label>
+      <input type="month" id="h-ini" />
+    </div>
+    <div class="filter-group">
+      <label>Data Ref. — Fim</label>
+      <input type="month" id="h-fim" />
+    </div>
+    <button class="btn btn-primary" id="h-aplicar">Aplicar</button>
+    <button class="btn btn-ghost"   id="h-limpar">Limpar</button>
+  </div>
+
+  <div class="data-table-wrap">
+    <div class="table-toolbar">
+      <h3>Lançamentos</h3>
+      <span class="table-info" id="h-info"></span>
+    </div>
+    <div class="scroll-x" id="h-table-area">
+      <div class="loading"><div class="spinner"></div> Carregando…</div>
+    </div>
+    <div class="pagination" id="h-pagination"></div>
+  </div>
+
+</div><!-- /tab-historico -->
+
+<!-- ══════════════════════════════════════════════════════════
+     ABA 3 — SALDOS
+══════════════════════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-saldos">
+
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Regional</label>
+      <select id="s-regional">
+        <option value="">Todas</option>
+        <option>Centro Oeste &amp; São Paulo</option>
+        <option>Sudeste &amp; Sul</option>
+        <option>Norte &amp; Nordeste</option>
+        <option>E-commerce</option>
+        <option>Exportação</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Mostrar</label>
+      <select id="s-filtro-saldo">
+        <option value="">Todos os saldos</option>
+        <option value="positivo">Apenas positivos</option>
+        <option value="negativo">Apenas negativos</option>
+        <option value="zero">Saldo zero</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Buscar distribuidor</label>
+      <input type="text" id="s-busca" placeholder="Nome ou código…" />
+    </div>
+    <button class="btn btn-primary" id="s-aplicar">Aplicar</button>
+    <button class="btn btn-ghost"   id="s-limpar">Limpar</button>
+  </div>
+
+  <div class="saldo-grid">
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="badge badge-hk">HK</span> Saldos Haskell
+        <span style="margin-left:auto;font-size:.75rem;" id="s-total-hk"></span>
+      </div>
+      <div class="scroll-x" id="s-hk-area">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="badge badge-om">OM</span> Saldos OhMy!
+        <span style="margin-left:auto;font-size:.75rem;" id="s-total-om"></span>
+      </div>
+      <div class="scroll-x" id="s-om-area">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /tab-saldos -->
+</div><!-- /main -->
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════════════
+const SUPABASE_URL  = 'https://ulvamkyvsasyjhvfhqje.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsdmFta3l2c2FzeWpodmZocWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMjg3NjEsImV4cCI6MjA5NDkwNDc2MX0.18kKUZKUCMMfh3bHzh73ftstoKTNLqr73jfF2OSlweU';   // ← substitua pela sua anon key
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ══════════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════════════════════════
+let allLancamentos = [];     // todos os lançamentos carregados
+let filteredHist   = [];     // histórico filtrado
+let histPage       = 1;
+const HIST_PAGE_SIZE = 50;
+
+let charts = {};             // instâncias Chart.js
+
+// ══════════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════════
+const fmt = (v) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+const fmtShort = (v) => {
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000) return (v / 1_000_000).toFixed(1).replace('.', ',') + ' M';
+  if (abs >= 1_000)     return (v / 1_000).toFixed(1).replace('.', ',') + ' k';
+  return fmt(v);
+};
+
+const ym = (dateStr) => dateStr ? dateStr.slice(0, 7) : '';  // "2026-06"
+
+const setStatus = (msg, cls = '') => {
+  const el = document.getElementById('statusBar');
+  el.textContent = msg;
+  el.className = 'topbar-status ' + cls;
+};
+
+// ══════════════════════════════════════════════════════════════
+// CARGA DE DADOS
+// ══════════════════════════════════════════════════════════════
+async function loadAll() {
+  setStatus('Conectando ao Supabase…');
+  try {
+    let all = [];
+    let from = 0;
+    const chunk = 1000;
+    while (true) {
+      const { data, error } = await db
+        .from('cc_lancamentos')
+        .select('*')
+        .range(from, from + chunk - 1)
+        .order('data_referencia', { ascending: false });
+      if (error) throw error;
+      all = all.concat(data);
+      if (data.length < chunk) break;
+      from += chunk;
+    }
+    allLancamentos = all;
+    const ultima = allLancamentos[0]?.data_referencia || '—';
+    setStatus(`Atualizado até ${ultima}`, 'ok');
+    onDataReady();
+  } catch (e) {
+    setStatus('Erro ao carregar dados', 'err');
+    console.error(e);
+  }
+}
+
+function onDataReady() {
+  populateSelectores();
+  aplicarFiltrosVG();
+  aplicarFiltrosHist();
+  aplicarFiltrosSaldos();
+}
+
+// ══════════════════════════════════════════════════════════════
+// SELECTORES DINÂMICOS
+// ══════════════════════════════════════════════════════════════
+function populateSelectores() {
+  // Tipos de crédito únicos
+  const tipos = [...new Set(allLancamentos.map(r => r.tipo_credito).filter(Boolean))].sort();
+  const selTipo = document.getElementById('h-tipo');
+  selTipo.innerHTML = '<option value="">Todos</option>' +
+    tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+
+  // Distribuidores únicos
+  const dists = [...new Map(allLancamentos.map(r => [r.cod_distribuidor, r.distribuidor])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  const selDist = document.getElementById('h-distribuidor');
+  selDist.innerHTML = '<option value="">Todos</option>' +
+    dists.map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// FILTROS — helpers
+// ══════════════════════════════════════════════════════════════
+function applyFilters(data, { empresa, regional, operacao, tipo, distribuidor, ini, fim } = {}) {
+  return data.filter(r => {
+    if (empresa      && r.empresa          !== empresa)      return false;
+    if (regional     && r.regional         !== regional)     return false;
+    if (operacao     && r.operacao         !== operacao)     return false;
+    if (tipo         && r.tipo_credito     !== tipo)         return false;
+    if (distribuidor && r.cod_distribuidor !== distribuidor) return false;
+    if (ini && ym(r.data_referencia) < ini) return false;
+    if (fim && ym(r.data_referencia) > fim) return false;
+    return true;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// ABA VISÃO GERAL
+// ══════════════════════════════════════════════════════════════
+function aplicarFiltrosVG() {
+  const empresa  = document.getElementById('vg-empresa').value;
+  const regional = document.getElementById('vg-regional').value;
+  const ini      = document.getElementById('vg-ini').value;
+  const fim      = document.getElementById('vg-fim').value;
+  const data     = applyFilters(allLancamentos, { empresa, regional, ini, fim });
+  renderKPIs(data);
+  renderCharts(data);
+}
+
+function renderKPIs(data) {
+  const creditos = data.filter(r => r.operacao === 'Crédito').reduce((s, r) => s + r.valor, 0);
+  const debitos  = data.filter(r => r.operacao === 'Débito' ).reduce((s, r) => s + r.valor, 0);
+  const saldo    = creditos + debitos;
+  const distAtivos = new Set(data.map(r => r.cod_distribuidor)).size;
+  const hkCred   = data.filter(r => r.empresa === 'Haskell' && r.operacao === 'Crédito').reduce((s,r) => s+r.valor, 0);
+  const omCred   = data.filter(r => r.empresa === 'OhMy!'   && r.operacao === 'Crédito').reduce((s,r) => s+r.valor, 0);
+  const hkSaldo  = data.filter(r => r.empresa === 'Haskell').reduce((s,r) => s+r.valor, 0);
+  const omSaldo  = data.filter(r => r.empresa === 'OhMy!').reduce((s,r) => s+r.valor, 0);
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Saldo Total</div>
+      <div class="kpi-value ${saldo >= 0 ? 'pos' : 'neg'}">${fmtShort(saldo)}</div>
+      <div class="kpi-sub">Créditos – Débitos</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total de Créditos</div>
+      <div class="kpi-value pos">${fmtShort(creditos)}</div>
+      <div class="kpi-sub">${data.filter(r => r.operacao === 'Crédito').length} lançamentos</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total de Débitos</div>
+      <div class="kpi-value neg">${fmtShort(debitos)}</div>
+      <div class="kpi-sub">${data.filter(r => r.operacao === 'Débito').length} lançamentos</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Distribuidores Ativos</div>
+      <div class="kpi-value neu">${distAtivos}</div>
+      <div class="kpi-sub">no período selecionado</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Saldo Haskell</div>
+      <div class="kpi-value pink">${fmtShort(hkSaldo)}</div>
+      <div class="kpi-sub">Créditos: ${fmtShort(hkCred)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Saldo OhMy!</div>
+      <div class="kpi-value" style="color:#5e35b1">${fmtShort(omSaldo)}</div>
+      <div class="kpi-sub">Créditos: ${fmtShort(omCred)}</div>
+    </div>
+  `;
+}
+
+function renderCharts(data) {
+  // ── Chart 1: Créditos vs Débitos por mês ──────────────
+  const byMonth = {};
+  data.forEach(r => {
+    const m = ym(r.data_referencia);
+    if (!m) return;
+    if (!byMonth[m]) byMonth[m] = { cred: 0, deb: 0 };
+    if (r.operacao === 'Crédito') byMonth[m].cred += r.valor;
+    else byMonth[m].deb += Math.abs(r.valor);
+  });
+  const months = Object.keys(byMonth).sort().slice(-18);
+
+  renderChart('chartMensal', 'bar', {
+    labels: months,
+    datasets: [
+      { label: 'Créditos', data: months.map(m => byMonth[m].cred), backgroundColor: 'rgba(45,106,79,.7)' },
+      { label: 'Débitos',  data: months.map(m => byMonth[m].deb),  backgroundColor: 'rgba(192,57,43,.7)' },
+    ]
+  });
+
+  // ── Chart 2: Saldo por Regional ──────────────────────
+  const byReg = {};
+  data.forEach(r => {
+    if (!byReg[r.regional]) byReg[r.regional] = 0;
+    byReg[r.regional] += r.valor;
+  });
+  const regs = Object.keys(byReg).sort();
+  renderChart('chartRegional', 'bar', {
+    labels: regs,
+    datasets: [{
+      label: 'Saldo',
+      data: regs.map(r => byReg[r]),
+      backgroundColor: regs.map(r => byReg[r] >= 0 ? 'rgba(82,183,136,.8)' : 'rgba(192,57,43,.7)'),
+    }]
+  }, { indexAxis: 'y' });
+
+  // ── Chart 3: Por Tipo de Crédito (créditos apenas) ───
+  const byCred = {};
+  data.filter(r => r.operacao === 'Crédito').forEach(r => {
+    const t = r.tipo_credito || 'Outros';
+    if (!byCred[t]) byCred[t] = 0;
+    byCred[t] += r.valor;
+  });
+  const tipos = Object.entries(byCred).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const COLORS = ['#2d6a4f','#52b788','#1b4332','#40916c','#74c69d',
+                  '#95d5b2','#b7e4c7','#d8f3dc','#5e35b1','#8bc34a'];
+  renderChart('chartTipo', 'doughnut', {
+    labels: tipos.map(t => t[0]),
+    datasets: [{
+      data: tipos.map(t => t[1]),
+      backgroundColor: COLORS,
+      borderWidth: 0,
+    }]
+  }, {}, true);
+
+  // ── Chart 4: Saldo acumulado ─────────────────────────
+  const sorted = data
+    .filter(r => r.data_referencia)
+    .sort((a,b) => a.data_referencia.localeCompare(b.data_referencia));
+  let acum = 0;
+  const acumByMonth = {};
+  sorted.forEach(r => {
+    const m = ym(r.data_referencia);
+    acum += r.valor;
+    acumByMonth[m] = acum;
+  });
+  const acumMonths = Object.keys(acumByMonth).sort();
+  renderChart('chartSaldoAcum', 'line', {
+    labels: acumMonths,
+    datasets: [{
+      label: 'Saldo Acumulado',
+      data: acumMonths.map(m => acumByMonth[m]),
+      borderColor: '#2d6a4f',
+      backgroundColor: 'rgba(45,106,79,.08)',
+      fill: true,
+      tension: .3,
+      pointRadius: 0,
+    }]
+  });
+}
+
+function renderChart(id, type, chartData, extraOptions = {}, isDoughnut = false) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, {
+    type,
+    data: chartData,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#6c757d', font: { size: 11 } },
+          position: isDoughnut ? 'right' : 'top',
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y ?? ctx.parsed ?? ctx.raw;
+              return ' ' + fmt(typeof v === 'object' ? v.x || v.y || 0 : v);
+            }
+          }
+        }
+      },
+      scales: isDoughnut ? {} : {
+        x: { ticks: { color: '#6c757d', font: { size: 10 } }, grid: { color: 'rgba(0,0,0,.05)' } },
+        y: { ticks: { color: '#6c757d', font: { size: 10 }, callback: v => fmtShort(v) }, grid: { color: 'rgba(0,0,0,.06)' } },
+      },
+      ...extraOptions,
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// ABA HISTÓRICO
+// ══════════════════════════════════════════════════════════════
+function aplicarFiltrosHist() {
+  histPage = 1;
+  filteredHist = applyFilters(allLancamentos, {
+    empresa:     document.getElementById('h-empresa').value,
+    regional:    document.getElementById('h-regional').value,
+    operacao:    document.getElementById('h-operacao').value,
+    tipo:        document.getElementById('h-tipo').value,
+    distribuidor:document.getElementById('h-distribuidor').value,
+    ini:         document.getElementById('h-ini').value,
+    fim:         document.getElementById('h-fim').value,
+  });
+  renderHistTable();
+}
+
+function renderHistTable() {
+  const total = filteredHist.length;
+  const pages = Math.max(1, Math.ceil(total / HIST_PAGE_SIZE));
+  histPage = Math.min(histPage, pages);
+  const slice = filteredHist.slice((histPage - 1) * HIST_PAGE_SIZE, histPage * HIST_PAGE_SIZE);
+
+  document.getElementById('h-info').textContent =
+    `${total.toLocaleString('pt-BR')} lançamentos  ·  página ${histPage} de ${pages}`;
+
+  const rows = slice.map(r => `
+    <tr>
+      <td>${r.data_referencia || '—'}</td>
+      <td><span class="pill ${r.empresa === 'Haskell' ? 'pill-hk' : 'pill-om'}">${r.empresa}</span></td>
+      <td>${r.regional || '—'}</td>
+      <td>${r.cod_distribuidor || '—'}</td>
+      <td>${r.distribuidor || '—'}</td>
+      <td>${r.tipo_credito || '—'}</td>
+      <td><span class="pill ${r.operacao === 'Crédito' ? 'pill-credito' : 'pill-debito'}">${r.operacao}</span></td>
+      <td class="${r.valor >= 0 ? 'val-pos' : 'val-neg'}">${fmt(r.valor)}</td>
+      <td style="color:var(--cinza-texto);max-width:220px;overflow:hidden;text-overflow:ellipsis">${r.observacao || '—'}</td>
+    </tr>`).join('');
+
+  document.getElementById('h-table-area').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Data Ref.</th><th>Empresa</th><th>Regional</th>
+        <th>Cód.</th><th>Distribuidor</th><th>Tipo</th>
+        <th>Operação</th><th>Valor</th><th>Observação</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="9" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum resultado.</td></tr>'}</tbody>
+    </table>`;
+
+  // Paginação
+  const nav = document.getElementById('h-pagination');
+  const btns = [];
+  btns.push(`<button class="page-btn" onclick="goHistPage(${histPage-1})" ${histPage<=1?'disabled':''}>‹ Anterior</button>`);
+  const range = pageRange(histPage, pages);
+  range.forEach(p => {
+    if (p === '…') btns.push(`<span style="color:var(--cinza-texto)">…</span>`);
+    else btns.push(`<button class="page-btn ${p===histPage?'active':''}" onclick="goHistPage(${p})">${p}</button>`);
+  });
+  btns.push(`<button class="page-btn" onclick="goHistPage(${histPage+1})" ${histPage>=pages?'disabled':''}>Próxima ›</button>`);
+  nav.innerHTML = btns.join('');
+}
+
+function goHistPage(p) {
+  histPage = p;
+  renderHistTable();
+  document.getElementById('tab-historico').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function pageRange(cur, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const r = [];
+  r.push(1);
+  if (cur > 3) r.push('…');
+  for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) r.push(i);
+  if (cur < total - 2) r.push('…');
+  r.push(total);
+  return r;
+}
+
+// ══════════════════════════════════════════════════════════════
+// ABA SALDOS
+// ══════════════════════════════════════════════════════════════
+function aplicarFiltrosSaldos() {
+  const regional    = document.getElementById('s-regional').value;
+  const filtroSaldo = document.getElementById('s-filtro-saldo').value;
+  const busca       = document.getElementById('s-busca').value.toLowerCase();
+
+  function calcSaldos(empresa) {
+    const byDist = {};
+    allLancamentos
+      .filter(r => r.empresa === empresa)
+      .forEach(r => {
+        const k = r.cod_distribuidor;
+        if (!byDist[k]) byDist[k] = { cod: k, nome: r.distribuidor, regional: r.regional, saldo: 0, creditos: 0, debitos: 0 };
+        byDist[k].saldo    += r.valor;
+        if (r.operacao === 'Crédito') byDist[k].creditos += r.valor;
+        else byDist[k].debitos += r.valor;
+      });
+    return Object.values(byDist);
+  }
+
+  function filterSaldos(list) {
+    return list.filter(d => {
+      if (regional && d.regional !== regional) return false;
+      if (filtroSaldo === 'positivo' && d.saldo <= 0) return false;
+      if (filtroSaldo === 'negativo' && d.saldo >= 0) return false;
+      if (filtroSaldo === 'zero'     && Math.abs(d.saldo) > 0.01) return false;
+      if (busca && !d.nome?.toLowerCase().includes(busca) && !d.cod?.toLowerCase().includes(busca)) return false;
+      return true;
+    }).sort((a, b) => b.saldo - a.saldo);
+  }
+
+  const hkList = filterSaldos(calcSaldos('Haskell'));
+  const omList = filterSaldos(calcSaldos('OhMy!'));
+
+  renderSaldoTable('s-hk-area', hkList);
+  renderSaldoTable('s-om-area', omList);
+
+  const hkTotal = hkList.reduce((s, d) => s + d.saldo, 0);
+  const omTotal = omList.reduce((s, d) => s + d.saldo, 0);
+  document.getElementById('s-total-hk').textContent = `${hkList.length} distribuidores · saldo total: ${fmtShort(hkTotal)}`;
+  document.getElementById('s-total-om').textContent = `${omList.length} distribuidores · saldo total: ${fmtShort(omTotal)}`;
+}
+
+function renderSaldoTable(areaId, list) {
+  const rows = list.map(d => `
+    <tr>
+      <td>${d.cod}</td>
+      <td>${d.nome}</td>
+      <td style="font-size:.72rem;color:var(--cinza-texto)">${d.regional || '—'}</td>
+      <td class="${d.saldo >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.saldo)}</td>
+      <td class="val-pos">${fmt(d.creditos)}</td>
+      <td class="val-neg">${fmt(d.debitos)}</td>
+    </tr>`).join('');
+
+  document.getElementById(areaId).innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Cód.</th><th>Distribuidor</th><th>Regional</th>
+        <th>Saldo</th><th>Créditos</th><th>Débitos</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum resultado.</td></tr>'}</tbody>
+    </table>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// EVENT LISTENERS
+// ══════════════════════════════════════════════════════════════
+document.getElementById('vg-aplicar').addEventListener('click', aplicarFiltrosVG);
+document.getElementById('vg-limpar').addEventListener('click', () => {
+  ['vg-empresa','vg-regional','vg-ini','vg-fim'].forEach(id => {
+    const el = document.getElementById(id); el.value = '';
+  });
+  aplicarFiltrosVG();
+});
+
+document.getElementById('h-aplicar').addEventListener('click', aplicarFiltrosHist);
+document.getElementById('h-limpar').addEventListener('click', () => {
+  ['h-empresa','h-regional','h-operacao','h-tipo','h-distribuidor','h-ini','h-fim'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  aplicarFiltrosHist();
+});
+
+document.getElementById('s-aplicar').addEventListener('click', aplicarFiltrosSaldos);
+document.getElementById('s-limpar').addEventListener('click', () => {
+  ['s-regional','s-filtro-saldo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('s-busca').value = '';
+  aplicarFiltrosSaldos();
+});
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+loadAll();
+</script>
+</body>
+</html>
