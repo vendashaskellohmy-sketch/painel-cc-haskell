@@ -492,6 +492,7 @@ async function loadAll() {
     const ultima = allLancamentos[0]?.data_referencia || '—';
     setStatus(`Atualizado até ${ultima}`, 'ok');
     onDataReady();
+    if (allFaturamento.length > 0) aplicarFiltrosVerba();
   } catch (e) {
     setStatus('Erro ao carregar dados', 'err');
     console.error(e);
@@ -895,7 +896,8 @@ async function loadFaturamento() {
       from += 1000;
     }
     allFaturamento = all;
-    aplicarFiltrosVerba();
+    // só renderiza se cc_lancamentos já carregou
+    if (allLancamentos.length > 0) aplicarFiltrosVerba();
   } catch(e) {
     console.error('Erro ao carregar faturamento:', e);
   }
@@ -904,37 +906,54 @@ async function loadFaturamento() {
 function aplicarFiltrosVerba() {
   const regional = document.getElementById('vc-regional').value;
 
-  const fat = regional
-    ? allFaturamento.filter(r => r.regional === regional)
-    : allFaturamento;
+  // Cruzar faturamento com regional via cc_lancamentos (que já tem regional)
+  // Mapear cod_distribuidor → regional a partir dos lançamentos
+  const mapaRegional = {};
+  allLancamentos.forEach(r => {
+    if (r.cod_distribuidor && r.regional && !REGIONAIS_EXCLUIDAS.has(r.regional)) {
+      mapaRegional[r.cod_distribuidor] = r.regional;
+    }
+  });
 
-  // Lançamentos GERENTE REGIONAL da conta corrente
+  // Somar faturamento HK e OM por regional
+  const fatPorRegional = {};
+  allFaturamento.forEach(r => {
+    const reg = mapaRegional[r.cod_distribuidor];
+    if (!reg || REGIONAIS_EXCLUIDAS.has(reg)) return;
+    if (regional && reg !== regional) return;
+    if (!fatPorRegional[reg]) fatPorRegional[reg] = { fat_hk: 0, fat_om: 0 };
+    fatPorRegional[reg].fat_hk += r.fat_hk || 0;
+    fatPorRegional[reg].fat_om += r.fat_om || 0;
+  });
+
+  // Lançamentos GERENTE REGIONAL
   const lancGR = semExcluidos(allLancamentos).filter(r =>
     r.tipo_credito === 'GERENTE REGIONAL' &&
     (regional ? r.regional === regional : true)
   );
 
-  renderVerbaKPIs(fat, lancGR);
-  renderVerbaTabRegional(fat, lancGR, regional);
+  renderVerbaKPIs(fatPorRegional, lancGR);
+  renderVerbaTabRegional(fatPorRegional, lancGR);
   renderVerbaHistorico(lancGR);
 }
 
-function calcVerbaPorRegional(fat, lancGR) {
+function calcVerbaPorRegional(fatPorRegional, lancGR) {
   const regionais = ['Centro Oeste & São Paulo', 'Sudeste & Sul', 'Norte & Nordeste'];
   return regionais.map(reg => {
-    const fatReg   = fat.filter(r => r.regional === reg);
-    const lancReg  = lancGR.filter(r => r.regional === reg);
-    const faturado = fatReg.reduce((s, r) => s + r.faturamento, 0);
+    const fat      = fatPorRegional[reg] || { fat_hk: 0, fat_om: 0 };
+    const faturado = fat.fat_hk + fat.fat_om;
     const gerada   = faturado * VERBA_PCT;
-    // utilizado = soma dos débitos GERENTE REGIONAL (já negativos)
-    const utilizado = Math.abs(lancReg.filter(r => r.operacao === 'Débito').reduce((s,r) => s + r.valor, 0));
-    const saldo    = gerada - utilizado;
-    return { regional: reg, faturado, gerada, utilizado, saldo };
+    const lancReg  = lancGR.filter(r => r.regional === reg);
+    const utilizado = Math.abs(
+      lancReg.filter(r => r.operacao === 'Débito').reduce((s,r) => s + r.valor, 0)
+    );
+    const saldo = gerada - utilizado;
+    return { regional: reg, faturado, fat_hk: fat.fat_hk, fat_om: fat.fat_om, gerada, utilizado, saldo };
   }).filter(r => r.faturado > 0 || r.utilizado > 0);
 }
 
-function renderVerbaKPIs(fat, lancGR) {
-  const dados = calcVerbaPorRegional(fat, lancGR);
+function renderVerbaKPIs(fatPorRegional, lancGR) {
+  const dados = calcVerbaPorRegional(fatPorRegional, lancGR);
   const totalGerada    = dados.reduce((s,r) => s + r.gerada, 0);
   const totalUtilizado = dados.reduce((s,r) => s + r.utilizado, 0);
   const totalSaldo     = totalGerada - totalUtilizado;
@@ -943,7 +962,7 @@ function renderVerbaKPIs(fat, lancGR) {
     <div class="kpi-card kpi-total">
       <div class="kpi-label">Verba Gerada</div>
       <div class="kpi-value pos">${fmt(totalGerada)}</div>
-      <div class="kpi-sub">0,7% do faturamento</div>
+      <div class="kpi-sub">0,7% do faturamento acumulado</div>
     </div>
     <div class="kpi-card" style="border-top:4px solid var(--vermelho)">
       <div class="kpi-label">Verba Utilizada</div>
@@ -958,21 +977,23 @@ function renderVerbaKPIs(fat, lancGR) {
   `;
 }
 
-function renderVerbaTabRegional(fat, lancGR, filtroRegional) {
-  const dados = calcVerbaPorRegional(fat, lancGR);
+function renderVerbaTabRegional(fatPorRegional, lancGR) {
+  const dados = calcVerbaPorRegional(fatPorRegional, lancGR);
 
   const rows = dados.map(d => `
     <tr>
-      <td>${d.regional}</td>
+      <td><strong>${d.regional}</strong></td>
+      <td class="val-pos">${fmt(d.fat_hk)}</td>
+      <td class="val-pos">${fmt(d.fat_om)}</td>
       <td class="val-pos">${fmt(d.faturado)}</td>
       <td class="val-pos">${fmt(d.gerada)}</td>
       <td class="val-neg">${fmt(d.utilizado)}</td>
       <td class="${d.saldo >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.saldo)}</td>
       <td>
-        <div style="background:var(--cinza-borda);border-radius:99px;height:8px;width:120px;overflow:hidden">
-          <div style="background:${d.saldo>=0?'var(--verde-mid)':'var(--vermelho)'};height:8px;width:${Math.min(100, d.gerada>0 ? (d.utilizado/d.gerada)*100 : 0).toFixed(0)}%"></div>
+        <div style="background:var(--cinza-borda);border-radius:99px;height:8px;width:100px;overflow:hidden;display:inline-block;vertical-align:middle">
+          <div style="background:${d.saldo>=0?'var(--verde-mid)':'var(--vermelho)'};height:8px;width:${Math.min(100, d.gerada>0?(d.utilizado/d.gerada)*100:0).toFixed(0)}%"></div>
         </div>
-        <span style="font-size:.7rem;color:var(--cinza-texto)">${d.gerada>0?((d.utilizado/d.gerada)*100).toFixed(1):0}% utilizado</span>
+        <span style="font-size:.7rem;color:var(--cinza-texto);margin-left:6px">${d.gerada>0?((d.utilizado/d.gerada)*100).toFixed(1):0}%</span>
       </td>
     </tr>`).join('');
 
@@ -980,19 +1001,21 @@ function renderVerbaTabRegional(fat, lancGR, filtroRegional) {
     <table>
       <thead><tr>
         <th>Regional</th>
-        <th>Faturamento</th>
+        <th>Fat. Haskell</th>
+        <th>Fat. OhMy!</th>
+        <th>Fat. Total</th>
         <th>Verba Gerada (0,7%)</th>
         <th>Utilizado</th>
         <th>Saldo</th>
         <th>Uso</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum dado.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum dado de faturamento.</td></tr>'}</tbody>
     </table>`;
 }
 
 function renderVerbaHistorico(lancGR) {
   const sorted = [...lancGR].sort((a,b) =>
-    (b.data_referencia || '').localeCompare(a.data_referencia || ''));
+    (b.data_referencia||'').localeCompare(a.data_referencia||''));
 
   document.getElementById('vc-hist-info').textContent =
     `${sorted.length.toLocaleString('pt-BR')} lançamentos`;
@@ -1016,7 +1039,7 @@ function renderVerbaHistorico(lancGR) {
         <th>Cód.</th><th>Distribuidor</th><th>Operação</th>
         <th>Valor</th><th>Observação</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum lançamento GERENTE REGIONAL encontrado.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum lançamento GERENTE REGIONAL.</td></tr>'}</tbody>
     </table>`;
 }
 
