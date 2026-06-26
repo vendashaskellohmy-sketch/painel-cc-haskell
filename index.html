@@ -903,20 +903,11 @@ async function loadFaturamento() {
 function aplicarFiltrosVerba() {
   const regional = document.getElementById('vc-regional').value;
 
-  // Cruzar faturamento com regional via cc_lancamentos (que já tem regional)
-  // Mapear cod_distribuidor → regional a partir dos lançamentos
-  const mapaRegional = {};
-  allLancamentos.forEach(r => {
-    if (r.cod_distribuidor && r.regional && !REGIONAIS_EXCLUIDAS.has(r.regional)) {
-      mapaRegional[r.cod_distribuidor] = r.regional;
-    }
-  });
-
-  // Somar faturamento HK e OM por regional
+  // Regional vem direto da tabela cc_faturamento (via cc_distribuidores.CSV)
   const fatPorRegional = {};
   allFaturamento.forEach(r => {
-    const reg = mapaRegional[r.cod_distribuidor];
-    if (!reg || REGIONAIS_EXCLUIDAS.has(reg)) return;
+    const reg = r.regional;
+    if (!reg || REGIONAIS_EXCLUIDAS.has(reg) || reg === 'Sem Regional') return;
     if (regional && reg !== regional) return;
     if (!fatPorRegional[reg]) fatPorRegional[reg] = { fat_hk: 0, fat_om: 0 };
     fatPorRegional[reg].fat_hk += r.fat_hk || 0;
