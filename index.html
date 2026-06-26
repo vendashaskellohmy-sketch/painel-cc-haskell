@@ -134,6 +134,18 @@ tr:last-child td { border-bottom: none; }
 .loading { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--cinza-texto); padding: 60px; font-size: .9rem; }
 .spinner { width: 22px; height: 22px; border: 3px solid var(--cinza-borda); border-top-color: var(--verde); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Header ── */
+.header { background:var(--verde-escuro); padding:0 2rem; height:68px; display:flex; align-items:center; gap:1rem; position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+.header-logo { height:44px; width:44px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.header-titles { flex:1; min-width:0; }
+.header-titles h1 { font-size:15px; font-weight:600; color:var(--branco); white-space:nowrap; }
+.header-titles p  { font-size:11px; color:rgba(255,255,255,.65); margin-top:2px; }
+.header-btns { display:flex; gap:8px; flex-shrink:0; }
+.btn-portal { background:var(--verde-mid); color:var(--branco); border:none; border-radius:6px; padding:7px 14px; font-size:12px; font-weight:500; cursor:pointer; white-space:nowrap; }
+.btn-portal:hover { background:#40916c; }
+.btn-pdf { background:#495057; color:var(--branco); border:none; border-radius:6px; padding:7px 14px; font-size:12px; font-weight:500; cursor:pointer; white-space:nowrap; }
+.btn-pdf:hover { background:#343a40; }
 </style>
 </head>
 <body>
@@ -399,7 +411,7 @@ tr:last-child td { border-bottom: none; }
   <!-- Tabela por regional -->
   <div class="data-table-wrap" style="margin-bottom:24px;">
     <div class="table-toolbar">
-      <h3>Verba por Regional</h3>
+      <h3>Verba por Regional <span style="font-size:.7rem;color:var(--cinza-texto);font-weight:400;font-style:italic;margin-left:6px">Sem promoção.</span></h3>
     </div>
     <div class="scroll-x" id="vc-table-regional">
       <div class="loading"><div class="spinner"></div></div>
@@ -969,7 +981,6 @@ function renderVerbaTabRegional(fatPorRegional, lancGR) {
     <tr>
       <td><strong>${d.regional}</strong></td>
       <td class="val-pos">${fmt(d.fat_hk)}</td>
-      <td style="font-size:.7rem;color:var(--cinza-texto);font-style:italic">Sem promoção</td>
       <td class="val-pos">${fmt(d.fat_om)}</td>
       <td class="val-pos">${fmt(d.faturado)}</td>
       <td class="val-pos">${fmt(d.gerada)}</td>
@@ -988,7 +999,6 @@ function renderVerbaTabRegional(fatPorRegional, lancGR) {
       <thead><tr>
         <th>Regional</th>
         <th>Fat. Haskell</th>
-        <th></th>
         <th>Fat. OhMy!</th>
         <th>Fat. Total</th>
         <th>Verba Gerada (0,7%)</th>
