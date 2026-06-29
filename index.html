@@ -393,24 +393,13 @@ tr:last-child td { border-bottom: none; }
     <button class="btn btn-ghost"   id="s-limpar">Limpar</button>
   </div>
 
-  <div class="saldo-grid">
-    <div class="table-card">
-      <div class="table-card-header">
-        <span class="badge badge-hk">HK</span> Saldos Haskell
-        <span style="margin-left:auto;font-size:.75rem;" id="s-total-hk"></span>
-      </div>
-      <div class="scroll-x" id="s-hk-area">
-        <div class="loading"><div class="spinner"></div></div>
-      </div>
+  <div class="data-table-wrap">
+    <div class="table-toolbar">
+      <h3>Saldos por Distribuidor</h3>
+      <span class="table-info" id="s-total-info"></span>
     </div>
-    <div class="table-card">
-      <div class="table-card-header">
-        <span class="badge badge-om">OM</span> Saldos OhMy!
-        <span style="margin-left:auto;font-size:.75rem;" id="s-total-om"></span>
-      </div>
-      <div class="scroll-x" id="s-om-area">
-        <div class="loading"><div class="spinner"></div></div>
-      </div>
+    <div class="scroll-x" id="s-unified-area">
+      <div class="loading"><div class="spinner"></div> Carregando…</div>
     </div>
   </div>
 
@@ -428,6 +417,14 @@ tr:last-child td { border-bottom: none; }
         <option>Sudeste &amp; Sul</option>
         <option>Norte &amp; Nordeste</option>
       </select>
+    </div>
+    <div class="filter-group">
+      <label>Código do distribuidor</label>
+      <input type="text" id="vc-cod" placeholder="Ex: D00015" style="min-width:130px" />
+    </div>
+    <div class="filter-group">
+      <label>Nome do distribuidor</label>
+      <input type="text" id="vc-nome" placeholder="Buscar…" />
     </div>
     <button class="btn btn-primary" id="vc-aplicar">Aplicar</button>
     <button class="btn btn-ghost"   id="vc-limpar">Limpar</button>
@@ -527,7 +524,8 @@ async function loadAll() {
       from += 1000;
     }
     allLancamentos = all;
-    const ultima = allLancamentos[0]?.data_referencia || '—';
+    const ultimaRaw = allLancamentos[0]?.data_referencia || '';
+    const ultima = ultimaRaw ? ultimaRaw.slice(8,10)+'/'+ultimaRaw.slice(5,7)+'/'+ultimaRaw.slice(0,4) : '—';
     setStatus(`Atualizado até ${ultima}`, 'ok');
     onDataReady();
     if (allFaturamento.length > 0) aplicarFiltrosVerba();
@@ -750,7 +748,7 @@ function renderHistTable() {
 
   const rows = slice.map(r => `
     <tr>
-      <td>${r.data_referencia || '—'}</td>
+      <td>${r.data_referencia ? r.data_referencia.slice(8,10)+'/'+r.data_referencia.slice(5,7)+'/'+r.data_referencia.slice(0,4) : '—'}</td>
       <td><span class="pill ${r.empresa === 'Haskell' ? 'pill-hk' : 'pill-om'}">${r.empresa}</span></td>
       <td>${r.regional || '—'}</td>
       <td>${r.cod_distribuidor || '—'}</td>
@@ -809,60 +807,72 @@ function aplicarFiltrosSaldos() {
 
   const base = semExcluidos(allLancamentos);
 
-  function calcSaldos(empresa) {
-    const byDist = {};
-    base.filter(r => r.empresa === empresa).forEach(r => {
-      const k = r.cod_distribuidor;
-      if (!byDist[k]) byDist[k] = { cod: k, nome: r.distribuidor, regional: r.regional, saldo: 0, creditos: 0, debitos: 0 };
-      byDist[k].saldo += r.valor;
-      if (r.operacao === 'Crédito') byDist[k].creditos += r.valor;
-      else byDist[k].debitos += r.valor;
-    });
-    return Object.values(byDist);
-  }
+  // Calcular saldos HK e OM por distribuidor numa única estrutura
+  const byDist = {};
+  base.forEach(r => {
+    const k = r.cod_distribuidor;
+    if (!byDist[k]) byDist[k] = {
+      cod: k, nome: r.distribuidor, regional: r.regional,
+      saldo_hk: 0, cred_hk: 0, deb_hk: 0,
+      saldo_om: 0, cred_om: 0, deb_om: 0,
+    };
+    const isHK = r.empresa === 'Haskell';
+    if (isHK) {
+      byDist[k].saldo_hk += r.valor;
+      if (r.operacao === 'Crédito') byDist[k].cred_hk += r.valor;
+      else byDist[k].deb_hk += r.valor;
+    } else {
+      byDist[k].saldo_om += r.valor;
+      if (r.operacao === 'Crédito') byDist[k].cred_om += r.valor;
+      else byDist[k].deb_om += r.valor;
+    }
+  });
 
-  function filterSaldos(list) {
-    return list.filter(d => {
-      if (regional && d.regional !== regional) return false;
-      if (filtroSaldo === 'positivo' && d.saldo <= 0) return false;
-      if (filtroSaldo === 'negativo' && d.saldo >= 0) return false;
-      if (filtroSaldo === 'zero'     && Math.abs(d.saldo) > 0.01) return false;
-      if (busca && !d.nome?.toLowerCase().includes(busca) && !d.cod?.toLowerCase().includes(busca)) return false;
-      return true;
-    }).sort((a, b) => b.saldo - a.saldo);
-  }
+  let list = Object.values(byDist).filter(d => {
+    if (regional && d.regional !== regional) return false;
+    const saldoTotal = d.saldo_hk + d.saldo_om;
+    if (filtroSaldo === 'positivo' && saldoTotal <= 0) return false;
+    if (filtroSaldo === 'negativo' && saldoTotal >= 0) return false;
+    if (filtroSaldo === 'zero'     && Math.abs(saldoTotal) > 0.01) return false;
+    if (busca && !d.nome?.toLowerCase().includes(busca) && !d.cod?.toLowerCase().includes(busca)) return false;
+    return true;
+  }).sort((a, b) => (b.saldo_hk + b.saldo_om) - (a.saldo_hk + a.saldo_om));
 
-  const hkList = filterSaldos(calcSaldos('Haskell'));
-  const omList = filterSaldos(calcSaldos('OhMy!'));
-
-  renderSaldoTable('s-hk-area', hkList);
-  renderSaldoTable('s-om-area', omList);
-
-  const hkTotal = hkList.reduce((s, d) => s + d.saldo, 0);
-  const omTotal = omList.reduce((s, d) => s + d.saldo, 0);
-  document.getElementById('s-total-hk').textContent = `${hkList.length} distribuidores · ${fmt(hkTotal)}`;
-  document.getElementById('s-total-om').textContent = `${omList.length} distribuidores · ${fmt(omTotal)}`;
-}
-
-function renderSaldoTable(areaId, list) {
   const rows = list.map(d => `
     <tr>
       <td>${d.cod}</td>
       <td>${d.nome}</td>
       <td style="font-size:.72rem;color:var(--cinza-texto)">${d.regional || '—'}</td>
-      <td class="${d.saldo >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.saldo)}</td>
-      <td class="val-pos">${fmt(d.creditos)}</td>
-      <td class="val-neg">${fmt(d.debitos)}</td>
+      <td class="${d.cred_hk >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.cred_hk)}</td>
+      <td class="val-neg">${fmt(d.deb_hk)}</td>
+      <td class="${d.saldo_hk >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.saldo_hk)}</td>
+      <td class="${d.cred_om >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.cred_om)}</td>
+      <td class="val-neg">${fmt(d.deb_om)}</td>
+      <td class="${d.saldo_om >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.saldo_om)}</td>
     </tr>`).join('');
 
-  document.getElementById(areaId).innerHTML = `
+  document.getElementById('s-unified-area').innerHTML = `
     <table>
-      <thead><tr>
-        <th>Cód.</th><th>Distribuidor</th><th>Regional</th>
-        <th>Saldo</th><th>Créditos</th><th>Débitos</th>
-      </tr></thead>
-      <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum resultado.</td></tr>'}</tbody>
+      <thead>
+        <tr>
+          <th rowspan="2">Cód.</th>
+          <th rowspan="2">Distribuidor</th>
+          <th rowspan="2">Regional</th>
+          <th colspan="3" style="text-align:center;background:var(--verde-claro);color:var(--verde-escuro)">Haskell</th>
+          <th colspan="3" style="text-align:center;background:var(--roxo-claro);color:var(--roxo)">OhMy!</th>
+        </tr>
+        <tr>
+          <th>Crédito</th><th>Débito</th><th>Saldo</th>
+          <th>Crédito</th><th>Débito</th><th>Saldo</th>
+        </tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="9" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum resultado.</td></tr>'}</tbody>
     </table>`;
+
+  const totHK = list.reduce((s,d) => s + d.saldo_hk, 0);
+  const totOM = list.reduce((s,d) => s + d.saldo_om, 0);
+  document.getElementById('s-total-info').textContent =
+    `${list.length} distribuidores · HK: ${fmt(totHK)} · OM: ${fmt(totOM)}`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -932,6 +942,8 @@ async function loadFaturamento() {
 
 function aplicarFiltrosVerba() {
   const regional = document.getElementById('vc-regional').value;
+  const filtroCod  = document.getElementById('vc-cod').value.trim().toLowerCase();
+  const filtroNome = document.getElementById('vc-nome').value.trim().toLowerCase();
 
   // Regional vem direto da tabela cc_faturamento (via cc_distribuidores.CSV)
   const fatPorRegional = {};
@@ -945,10 +957,13 @@ function aplicarFiltrosVerba() {
   });
 
   // Lançamentos GERENTE REGIONAL
-  const lancGR = semExcluidos(allLancamentos).filter(r =>
-    r.tipo_credito === 'GERENTE REGIONAL' &&
-    (regional ? r.regional === regional : true)
-  );
+  const lancGR = semExcluidos(allLancamentos).filter(r => {
+    if (r.tipo_credito !== 'GERENTE REGIONAL') return false;
+    if (regional && r.regional !== regional) return false;
+    if (filtroCod  && !(r.cod_distribuidor || '').toLowerCase().includes(filtroCod)) return false;
+    if (filtroNome && !(r.distribuidor || '').toLowerCase().includes(filtroNome)) return false;
+    return true;
+  });
 
   renderVerbaKPIs(fatPorRegional, lancGR);
   renderVerbaTabRegional(fatPorRegional, lancGR);
@@ -1040,7 +1055,7 @@ function renderVerbaHistorico(lancGR) {
 
   const rows = sorted.map(r => `
     <tr>
-      <td>${r.data_referencia || '—'}</td>
+      <td>${r.data_referencia ? r.data_referencia.slice(8,10)+'/'+r.data_referencia.slice(5,7)+'/'+r.data_referencia.slice(0,4) : '—'}</td>
       <td><span class="pill ${r.empresa==='Haskell'?'pill-hk':'pill-om'}">${r.empresa}</span></td>
       <td>${r.regional || '—'}</td>
       <td>${r.cod_distribuidor || '—'}</td>
@@ -1064,6 +1079,8 @@ function renderVerbaHistorico(lancGR) {
 document.getElementById('vc-aplicar').addEventListener('click', aplicarFiltrosVerba);
 document.getElementById('vc-limpar').addEventListener('click', () => {
   document.getElementById('vc-regional').value = '';
+  document.getElementById('vc-cod').value = '';
+  document.getElementById('vc-nome').value = '';
   aplicarFiltrosVerba();
 });
 
