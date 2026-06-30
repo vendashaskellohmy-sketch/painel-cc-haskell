@@ -197,6 +197,7 @@ tr:last-child td { border-bottom: none; }
   <button class="tab-btn"        data-tab="historico">Histórico de Lançamentos</button>
   <button class="tab-btn"        data-tab="saldos">Saldos por Distribuidor</button>
   <button class="tab-btn"        data-tab="verba">Verba Comercial</button>
+  <button class="tab-btn"        data-tab="trade">Verba Trade</button>
 </nav>
 
 <div class="main">
@@ -458,6 +459,40 @@ tr:last-child td { border-bottom: none; }
 
 </div><!-- /tab-verba -->
 
+<!-- ══ ABA 5 — VERBA TRADE ══ -->
+<div class="tab-pane" id="tab-trade">
+
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Código do distribuidor</label>
+      <input type="text" id="vt-cod" placeholder="Ex: D00015" style="min-width:130px" />
+    </div>
+    <div class="filter-group">
+      <label>Nome do distribuidor</label>
+      <input type="text" id="vt-nome" placeholder="Buscar…" />
+    </div>
+    <button class="btn btn-primary" id="vt-aplicar">Aplicar</button>
+    <button class="btn btn-ghost"   id="vt-limpar">Limpar</button>
+  </div>
+
+  <!-- KPIs verba trade -->
+  <div class="kpi-row" id="vt-kpi-row" style="grid-template-columns: repeat(3,1fr); margin-bottom:24px;">
+    <div class="loading"><div class="spinner"></div> Carregando…</div>
+  </div>
+
+  <!-- Histórico de uso (lançamentos TRADE) -->
+  <div class="data-table-wrap">
+    <div class="table-toolbar">
+      <h3>Histórico de Uso — Lançamentos TRADE</h3>
+      <span class="table-info" id="vt-hist-info"></span>
+    </div>
+    <div class="scroll-x" id="vt-hist-table">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+</div><!-- /tab-trade -->
+
 </div><!-- /main -->
 
 <script>
@@ -466,6 +501,7 @@ tr:last-child td { border-bottom: none; }
 // ══════════════════════════════════════════════════════════════
 const SUPABASE_URL  = 'https://ulvamkyvsasyjhvfhqje.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsdmFta3l2c2FzeWpodmZocWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMjg3NjEsImV4cCI6MjA5NDkwNDc2MX0.18kKUZKUCMMfh3bHzh73ftstoKTNLqr73jfF2OSlweU';
+
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -528,7 +564,7 @@ async function loadAll() {
     const ultima = ultimaRaw ? ultimaRaw.slice(8,10)+'/'+ultimaRaw.slice(5,7)+'/'+ultimaRaw.slice(0,4) : '—';
     setStatus(`Atualizado até ${ultima}`, 'ok');
     onDataReady();
-    if (allFaturamento.length > 0) aplicarFiltrosVerba();
+    if (allFaturamento.length > 0) { aplicarFiltrosVerba(); aplicarFiltrosTrade(); }
   } catch (e) {
     setStatus('Erro ao carregar dados', 'err');
     console.error(e);
@@ -934,7 +970,7 @@ async function loadFaturamento() {
     }
     allFaturamento = all;
     // só renderiza se cc_lancamentos já carregou
-    if (allLancamentos.length > 0) aplicarFiltrosVerba();
+    if (allLancamentos.length > 0) { aplicarFiltrosVerba(); aplicarFiltrosTrade(); }
   } catch(e) {
     console.error('Erro ao carregar faturamento:', e);
   }
@@ -1082,6 +1118,93 @@ document.getElementById('vc-limpar').addEventListener('click', () => {
   document.getElementById('vc-cod').value = '';
   document.getElementById('vc-nome').value = '';
   aplicarFiltrosVerba();
+});
+
+// ══════════════════════════════════════════════════════════════
+// ABA VERBA TRADE
+// ══════════════════════════════════════════════════════════════
+const VERBA_TRADE_PCT = 0.015;
+
+function aplicarFiltrosTrade() {
+  const filtroCod  = document.getElementById('vt-cod').value.trim().toLowerCase();
+  const filtroNome = document.getElementById('vt-nome').value.trim().toLowerCase();
+
+  // Faturamento total nacional (sem promoção) — soma de todas as regionais
+  const fatTotal = allFaturamento.reduce((s, r) => s + (r.fat_hk || 0) + (r.fat_om || 0), 0);
+  const gerada = fatTotal * VERBA_TRADE_PCT;
+
+  // Lançamentos TRADE
+  const lancTrade = semExcluidos(allLancamentos).filter(r => {
+    if (r.tipo_credito !== 'TRADE') return false;
+    if (filtroCod  && !(r.cod_distribuidor || '').toLowerCase().includes(filtroCod)) return false;
+    if (filtroNome && !(r.distribuidor || '').toLowerCase().includes(filtroNome)) return false;
+    return true;
+  });
+
+  const utilizado = Math.abs(
+    lancTrade.filter(r => r.operacao === 'Débito').reduce((s,r) => s + r.valor, 0)
+  );
+  const saldo = gerada - utilizado;
+
+  renderTradeKPIs(gerada, utilizado, saldo);
+  renderTradeHistorico(lancTrade);
+}
+
+function renderTradeKPIs(gerada, utilizado, saldo) {
+  document.getElementById('vt-kpi-row').innerHTML = `
+    <div class="kpi-card kpi-total">
+      <div class="kpi-label">Verba Gerada</div>
+      <div class="kpi-value pos">${fmt(gerada)}</div>
+      <div class="kpi-sub">1,5% do faturamento nacional</div>
+    </div>
+    <div class="kpi-card" style="border-top:4px solid var(--vermelho)">
+      <div class="kpi-label">Verba Utilizada</div>
+      <div class="kpi-value neg">${fmt(utilizado)}</div>
+      <div class="kpi-sub">Lançamentos TRADE</div>
+    </div>
+    <div class="kpi-card" style="border-top:4px solid var(--verde-mid)">
+      <div class="kpi-label">Saldo Disponível</div>
+      <div class="kpi-value ${saldo >= 0 ? 'pos' : 'neg'}">${fmt(saldo)}</div>
+      <div class="kpi-sub">Gerada – Utilizada</div>
+    </div>
+  `;
+}
+
+function renderTradeHistorico(lancTrade) {
+  const sorted = [...lancTrade].sort((a,b) =>
+    (b.data_referencia||'').localeCompare(a.data_referencia||''));
+
+  document.getElementById('vt-hist-info').textContent =
+    `${sorted.length.toLocaleString('pt-BR')} lançamentos`;
+
+  const rows = sorted.map(r => `
+    <tr>
+      <td>${r.data_referencia ? r.data_referencia.slice(8,10)+'/'+r.data_referencia.slice(5,7)+'/'+r.data_referencia.slice(0,4) : '—'}</td>
+      <td><span class="pill ${r.empresa==='Haskell'?'pill-hk':'pill-om'}">${r.empresa}</span></td>
+      <td>${r.regional || '—'}</td>
+      <td>${r.cod_distribuidor || '—'}</td>
+      <td>${r.distribuidor || '—'}</td>
+      <td><span class="pill ${r.operacao==='Crédito'?'pill-credito':'pill-debito'}">${r.operacao}</span></td>
+      <td class="${r.valor>=0?'val-pos':'val-neg'}">${fmt(r.valor)}</td>
+      <td style="color:var(--cinza-texto);max-width:220px;overflow:hidden;text-overflow:ellipsis">${r.observacao||'—'}</td>
+    </tr>`).join('');
+
+  document.getElementById('vt-hist-table').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Data</th><th>Empresa</th><th>Regional</th>
+        <th>Cód.</th><th>Distribuidor</th><th>Operação</th>
+        <th>Valor</th><th>Observação</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum lançamento TRADE.</td></tr>'}</tbody>
+    </table>`;
+}
+
+document.getElementById('vt-aplicar').addEventListener('click', aplicarFiltrosTrade);
+document.getElementById('vt-limpar').addEventListener('click', () => {
+  document.getElementById('vt-cod').value = '';
+  document.getElementById('vt-nome').value = '';
+  aplicarFiltrosTrade();
 });
 
 
