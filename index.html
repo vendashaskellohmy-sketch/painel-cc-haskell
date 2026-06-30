@@ -480,6 +480,16 @@ tr:last-child td { border-bottom: none; }
     <div class="loading"><div class="spinner"></div> Carregando…</div>
   </div>
 
+  <!-- Tabela Trade -->
+  <div class="data-table-wrap" style="margin-bottom:24px;">
+    <div class="table-toolbar">
+      <h3>Verba Trade <span style="font-size:.7rem;color:var(--cinza-texto);font-weight:400;font-style:italic;margin-left:6px">Sem promoção.</span></h3>
+    </div>
+    <div class="scroll-x" id="vt-table-trade">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
   <!-- Histórico de uso (lançamentos TRADE) -->
   <div class="data-table-wrap">
     <div class="table-toolbar">
@@ -1130,7 +1140,9 @@ function aplicarFiltrosTrade() {
   const filtroNome = document.getElementById('vt-nome').value.trim().toLowerCase();
 
   // Faturamento total nacional (sem promoção) — soma de todas as regionais
-  const fatTotal = allFaturamento.reduce((s, r) => s + (r.fat_hk || 0) + (r.fat_om || 0), 0);
+  const fatHK  = allFaturamento.reduce((s, r) => s + (r.fat_hk || 0), 0);
+  const fatOM  = allFaturamento.reduce((s, r) => s + (r.fat_om || 0), 0);
+  const fatTotal = fatHK + fatOM;
   const gerada = fatTotal * VERBA_TRADE_PCT;
 
   // Lançamentos TRADE
@@ -1147,7 +1159,43 @@ function aplicarFiltrosTrade() {
   const saldo = gerada - utilizado;
 
   renderTradeKPIs(gerada, utilizado, saldo);
+  renderTradeTabela(fatHK, fatOM, fatTotal, gerada, utilizado, saldo);
   renderTradeHistorico(lancTrade);
+}
+
+function renderTradeTabela(fatHK, fatOM, fatTotal, gerada, utilizado, saldo) {
+  const pct = gerada > 0 ? (utilizado/gerada)*100 : 0;
+
+  document.getElementById('vt-table-trade').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Trade</th>
+        <th>Fat. Haskell</th>
+        <th>Fat. OhMy!</th>
+        <th>Fat. Total</th>
+        <th>Verba Gerada (1,5%)</th>
+        <th>Utilizado</th>
+        <th>Saldo</th>
+        <th>Uso</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Trade</strong></td>
+          <td class="val-pos">${fmt(fatHK)}</td>
+          <td class="val-pos">${fmt(fatOM)}</td>
+          <td class="val-pos">${fmt(fatTotal)}</td>
+          <td class="val-pos">${fmt(gerada)}</td>
+          <td class="val-neg">${fmt(utilizado)}</td>
+          <td class="${saldo >= 0 ? 'val-pos' : 'val-neg'}">${fmt(saldo)}</td>
+          <td>
+            <div style="background:var(--cinza-borda);border-radius:99px;height:8px;width:100px;overflow:hidden;display:inline-block;vertical-align:middle">
+              <div style="background:${saldo>=0?'var(--verde-mid)':'var(--vermelho)'};height:8px;width:${Math.min(100, pct).toFixed(0)}%"></div>
+            </div>
+            <span style="font-size:.7rem;color:var(--cinza-texto);margin-left:6px">${pct.toFixed(1)}%</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>`;
 }
 
 function renderTradeKPIs(gerada, utilizado, saldo) {
