@@ -944,7 +944,7 @@ let allFaturamento = [];
 const CATEGORIAS_VERBA = {
   'Campanhas Promocionais': {
     pct: 0.045,
-    tipos: ['PROMOÇÃO COLORAÇÃO', 'PROMOÇÃO KIT PRATIC', 'PROMOÇÃO TONALIZANTE', 'PROMOÇÃO TRATAMENTO'],
+    tipos: ['PROMOÇÃO COLORAÇÃO', 'PROMOÇÃO KIT PRATIC', 'PROMOÇÃO TONALIZANTE', 'PROMOÇÃO TRATAMENTO', 'PROMOÇÃO'],
     nacional: true,
   },
   'MDS': {
@@ -1009,9 +1009,14 @@ function aplicarFiltrosVerba() {
     fatPorRegional[reg] += (r.fat_hk || 0) + (r.fat_om || 0);
   });
 
-  // Lançamentos de verba (créditos dos tipos mapeados)
-  const lancVerba = semExcluidos(allLancamentos).filter(r =>
-    TODOS_TIPOS_VERBA.includes(r.tipo_credito)
+  // Ano da verba = ano do faturamento carregado
+  const anoVerba = String(allFaturamento[0]?.ano || new Date().getFullYear());
+
+  // Lançamentos de verba: créditos dos tipos mapeados, apenas do ano da verba.
+  // Não exclui regionais — a verba utilizada considera todos os lançamentos.
+  const lancVerba = allLancamentos.filter(r =>
+    TODOS_TIPOS_VERBA.includes(r.tipo_credito) &&
+    (r.data_referencia || '').startsWith(anoVerba)
   );
 
   // Utilizado por categoria = soma dos CRÉDITOS dos tipos correspondentes
