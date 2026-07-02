@@ -197,7 +197,6 @@ tr:last-child td { border-bottom: none; }
   <button class="tab-btn"        data-tab="historico">Histórico de Lançamentos</button>
   <button class="tab-btn"        data-tab="saldos">Saldos por Distribuidor</button>
   <button class="tab-btn"        data-tab="verba">Verba Comercial</button>
-  <button class="tab-btn"        data-tab="trade">Verba Trade</button>
 </nav>
 
 <div class="main">
@@ -406,7 +405,7 @@ tr:last-child td { border-bottom: none; }
 
 </div><!-- /tab-saldos -->
 
-<!-- ══ ABA 4 — VERBA COMERCIAL ══ -->
+<!-- ══ ABA 4 — VERBA COMERCIAL (8,5%) ══ -->
 <div class="tab-pane" id="tab-verba">
 
   <div class="filter-bar">
@@ -417,6 +416,16 @@ tr:last-child td { border-bottom: none; }
         <option>Centro Oeste &amp; São Paulo</option>
         <option>Sudeste &amp; Sul</option>
         <option>Norte &amp; Nordeste</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Categoria</label>
+      <select id="vc-categoria">
+        <option value="">Todas</option>
+        <option>Campanhas Promocionais</option>
+        <option>MDS</option>
+        <option>Trade</option>
+        <option>Gerente Regional</option>
       </select>
     </div>
     <div class="filter-group">
@@ -431,25 +440,35 @@ tr:last-child td { border-bottom: none; }
     <button class="btn btn-ghost"   id="vc-limpar">Limpar</button>
   </div>
 
-  <!-- KPIs verba -->
+  <!-- KPIs verba total -->
   <div class="kpi-row" id="vc-kpi-row" style="grid-template-columns: repeat(3,1fr); margin-bottom:24px;">
     <div class="loading"><div class="spinner"></div> Carregando…</div>
   </div>
 
-  <!-- Tabela por regional -->
+  <!-- Tabela por categoria -->
   <div class="data-table-wrap" style="margin-bottom:24px;">
     <div class="table-toolbar">
-      <h3>Verba por Regional <span style="font-size:.7rem;color:var(--cinza-texto);font-weight:400;font-style:italic;margin-left:6px">Sem promoção.</span></h3>
+      <h3>Verba por Categoria <span style="font-size:.7rem;color:var(--cinza-texto);font-weight:400;font-style:italic;margin-left:6px">Verba comercial total: 8,5% do faturamento com promoção.</span></h3>
     </div>
-    <div class="scroll-x" id="vc-table-regional">
+    <div class="scroll-x" id="vc-table-categoria">
       <div class="loading"><div class="spinner"></div></div>
     </div>
   </div>
 
-  <!-- Histórico de uso (lançamentos GERENTE REGIONAL) -->
+  <!-- Tabela Gerente Regional por regional -->
+  <div class="data-table-wrap" style="margin-bottom:24px;">
+    <div class="table-toolbar">
+      <h3>Gerente Regional — por Regional <span style="font-size:.7rem;color:var(--cinza-texto);font-weight:400;font-style:italic;margin-left:6px">0,5% do faturamento de cada regional.</span></h3>
+    </div>
+    <div class="scroll-x" id="vc-table-gr">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- Histórico de uso -->
   <div class="data-table-wrap">
     <div class="table-toolbar">
-      <h3>Histórico de Uso — Lançamentos GERENTE REGIONAL</h3>
+      <h3>Histórico de Uso — Créditos das Verbas</h3>
       <span class="table-info" id="vc-hist-info"></span>
     </div>
     <div class="scroll-x" id="vc-hist-table">
@@ -458,50 +477,6 @@ tr:last-child td { border-bottom: none; }
   </div>
 
 </div><!-- /tab-verba -->
-
-<!-- ══ ABA 5 — VERBA TRADE ══ -->
-<div class="tab-pane" id="tab-trade">
-
-  <div class="filter-bar">
-    <div class="filter-group">
-      <label>Código do distribuidor</label>
-      <input type="text" id="vt-cod" placeholder="Ex: D00015" style="min-width:130px" />
-    </div>
-    <div class="filter-group">
-      <label>Nome do distribuidor</label>
-      <input type="text" id="vt-nome" placeholder="Buscar…" />
-    </div>
-    <button class="btn btn-primary" id="vt-aplicar">Aplicar</button>
-    <button class="btn btn-ghost"   id="vt-limpar">Limpar</button>
-  </div>
-
-  <!-- KPIs verba trade -->
-  <div class="kpi-row" id="vt-kpi-row" style="grid-template-columns: repeat(3,1fr); margin-bottom:24px;">
-    <div class="loading"><div class="spinner"></div> Carregando…</div>
-  </div>
-
-  <!-- Tabela Trade -->
-  <div class="data-table-wrap" style="margin-bottom:24px;">
-    <div class="table-toolbar">
-      <h3>Verba Trade <span style="font-size:.7rem;color:var(--cinza-texto);font-weight:400;font-style:italic;margin-left:6px">Sem promoção.</span></h3>
-    </div>
-    <div class="scroll-x" id="vt-table-trade">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
-  </div>
-
-  <!-- Histórico de uso (lançamentos TRADE) -->
-  <div class="data-table-wrap">
-    <div class="table-toolbar">
-      <h3>Histórico de Uso — Lançamentos TRADE</h3>
-      <span class="table-info" id="vt-hist-info"></span>
-    </div>
-    <div class="scroll-x" id="vt-hist-table">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
-  </div>
-
-</div><!-- /tab-trade -->
 
 </div><!-- /main -->
 
@@ -574,7 +549,7 @@ async function loadAll() {
     const ultima = ultimaRaw ? ultimaRaw.slice(8,10)+'/'+ultimaRaw.slice(5,7)+'/'+ultimaRaw.slice(0,4) : '—';
     setStatus(`Atualizado até ${ultima}`, 'ok');
     onDataReady();
-    if (allFaturamento.length > 0) { aplicarFiltrosVerba(); aplicarFiltrosTrade(); }
+    if (allFaturamento.length > 0) aplicarFiltrosVerba();
   } catch (e) {
     setStatus('Erro ao carregar dados', 'err');
     console.error(e);
@@ -961,10 +936,41 @@ document.getElementById('s-limpar').addEventListener('click', () => {
 
 
 // ══════════════════════════════════════════════════════════════
-// ABA VERBA COMERCIAL
+// ABA VERBA COMERCIAL (8,5%)
 // ══════════════════════════════════════════════════════════════
 let allFaturamento = [];
-const VERBA_PCT = 0.007;
+
+// Categorias da verba comercial total (8,5% do faturamento com promoção)
+const CATEGORIAS_VERBA = {
+  'Campanhas Promocionais': {
+    pct: 0.045,
+    tipos: ['PROMOÇÃO COLORAÇÃO', 'PROMOÇÃO KIT PRATIC', 'PROMOÇÃO TONALIZANTE', 'PROMOÇÃO TRATAMENTO'],
+    nacional: true,
+  },
+  'MDS': {
+    pct: 0.02,
+    tipos: ['MDs'],
+    nacional: true,
+  },
+  'Trade': {
+    pct: 0.015,
+    tipos: ['TRADE'],
+    nacional: true,
+  },
+  'Gerente Regional': {
+    pct: 0.005,
+    tipos: ['GERENTE REGIONAL'],
+    nacional: false,
+  },
+};
+const VERBA_TOTAL_PCT = 0.085;
+
+// Mapa tipo_credito → categoria (para o histórico)
+const TIPO_PARA_CATEGORIA = {};
+Object.entries(CATEGORIAS_VERBA).forEach(([cat, cfg]) => {
+  cfg.tipos.forEach(t => TIPO_PARA_CATEGORIA[t] = cat);
+});
+const TODOS_TIPOS_VERBA = Object.keys(TIPO_PARA_CATEGORIA);
 
 async function loadFaturamento() {
   try {
@@ -979,121 +985,202 @@ async function loadFaturamento() {
       from += 1000;
     }
     allFaturamento = all;
-    // só renderiza se cc_lancamentos já carregou
-    if (allLancamentos.length > 0) { aplicarFiltrosVerba(); aplicarFiltrosTrade(); }
+    if (allLancamentos.length > 0) aplicarFiltrosVerba();
   } catch(e) {
     console.error('Erro ao carregar faturamento:', e);
   }
 }
 
 function aplicarFiltrosVerba() {
-  const regional = document.getElementById('vc-regional').value;
+  const regional   = document.getElementById('vc-regional').value;
+  const categoria  = document.getElementById('vc-categoria').value;
   const filtroCod  = document.getElementById('vc-cod').value.trim().toLowerCase();
   const filtroNome = document.getElementById('vc-nome').value.trim().toLowerCase();
 
-  // Regional vem direto da tabela cc_faturamento (via cc_distribuidores.CSV)
+  // Faturamento nacional (COM promoção)
+  const fatNacional = allFaturamento.reduce((s, r) => s + (r.fat_hk_total || 0) + (r.fat_om_total || 0), 0);
+
+  // Faturamento por regional (para Gerente Regional)
   const fatPorRegional = {};
   allFaturamento.forEach(r => {
     const reg = r.regional;
     if (!reg || REGIONAIS_EXCLUIDAS.has(reg) || reg === 'Sem Regional') return;
-    if (regional && reg !== regional) return;
-    if (!fatPorRegional[reg]) fatPorRegional[reg] = { fat_hk: 0, fat_om: 0 };
-    fatPorRegional[reg].fat_hk += r.fat_hk || 0;
-    fatPorRegional[reg].fat_om += r.fat_om || 0;
+    if (!fatPorRegional[reg]) fatPorRegional[reg] = 0;
+    fatPorRegional[reg] += (r.fat_hk_total || 0) + (r.fat_om_total || 0);
   });
 
-  // Lançamentos GERENTE REGIONAL
-  const lancGR = semExcluidos(allLancamentos).filter(r => {
-    if (r.tipo_credito !== 'GERENTE REGIONAL') return false;
-    if (regional && r.regional !== regional) return false;
-    if (filtroCod  && !(r.cod_distribuidor || '').toLowerCase().includes(filtroCod)) return false;
-    if (filtroNome && !(r.distribuidor || '').toLowerCase().includes(filtroNome)) return false;
-    return true;
+  // Lançamentos de verba (créditos dos tipos mapeados)
+  const lancVerba = semExcluidos(allLancamentos).filter(r =>
+    TODOS_TIPOS_VERBA.includes(r.tipo_credito)
+  );
+
+  // Utilizado por categoria = soma dos CRÉDITOS dos tipos correspondentes
+  const utilizadoPorCategoria = {};
+  Object.keys(CATEGORIAS_VERBA).forEach(cat => utilizadoPorCategoria[cat] = 0);
+  const utilizadoGRPorRegional = {};
+
+  lancVerba.filter(r => r.operacao === 'Crédito').forEach(r => {
+    const cat = TIPO_PARA_CATEGORIA[r.tipo_credito];
+    if (!cat) return;
+    utilizadoPorCategoria[cat] += r.valor;
+    if (cat === 'Gerente Regional') {
+      if (!utilizadoGRPorRegional[r.regional]) utilizadoGRPorRegional[r.regional] = 0;
+      utilizadoGRPorRegional[r.regional] += r.valor;
+    }
   });
 
-  renderVerbaKPIs(fatPorRegional, lancGR);
-  renderVerbaTabRegional(fatPorRegional, lancGR);
-  renderVerbaHistorico(lancGR);
-}
+  // Dados por categoria
+  const dadosCategoria = Object.entries(CATEGORIAS_VERBA).map(([cat, cfg]) => {
+    const gerada    = fatNacional * cfg.pct;
+    const utilizado = utilizadoPorCategoria[cat];
+    return { categoria: cat, pct: cfg.pct, gerada, utilizado, saldo: gerada - utilizado };
+  });
 
-function calcVerbaPorRegional(fatPorRegional, lancGR) {
-  const regionais = ['Centro Oeste & São Paulo', 'Sudeste & Sul', 'Norte & Nordeste'];
-  return regionais.map(reg => {
-    const fat      = fatPorRegional[reg] || { fat_hk: 0, fat_om: 0 };
-    const faturado = fat.fat_hk + fat.fat_om;
-    const gerada   = faturado * VERBA_PCT;
-    const lancReg  = lancGR.filter(r => r.regional === reg);
-    const utilizado = Math.abs(
-      lancReg.filter(r => r.operacao === 'Débito').reduce((s,r) => s + r.valor, 0)
-    );
-    const saldo = gerada - utilizado;
-    return { regional: reg, faturado, fat_hk: fat.fat_hk, fat_om: fat.fat_om, gerada, utilizado, saldo };
-  }).filter(r => r.faturado > 0 || r.utilizado > 0);
-}
-
-function renderVerbaKPIs(fatPorRegional, lancGR) {
-  const dados = calcVerbaPorRegional(fatPorRegional, lancGR);
-  const totalGerada    = dados.reduce((s,r) => s + r.gerada, 0);
-  const totalUtilizado = dados.reduce((s,r) => s + r.utilizado, 0);
+  const totalGerada    = fatNacional * VERBA_TOTAL_PCT;
+  const totalUtilizado = dadosCategoria.reduce((s, d) => s + d.utilizado, 0);
   const totalSaldo     = totalGerada - totalUtilizado;
 
+  renderVerbaKPIs(totalGerada, totalUtilizado, totalSaldo);
+  renderVerbaCategoria(dadosCategoria, totalGerada, totalUtilizado, totalSaldo, categoria);
+  renderVerbaGR(fatPorRegional, utilizadoGRPorRegional, regional);
+  renderVerbaHistorico(lancVerba, { regional, categoria, filtroCod, filtroNome });
+}
+
+function renderVerbaKPIs(gerada, utilizado, saldo) {
   document.getElementById('vc-kpi-row').innerHTML = `
     <div class="kpi-card kpi-total">
-      <div class="kpi-label">Verba Gerada</div>
-      <div class="kpi-value pos">${fmt(totalGerada)}</div>
-      <div class="kpi-sub">0,7% do faturamento acumulado</div>
+      <div class="kpi-label">Verba Comercial Gerada</div>
+      <div class="kpi-value pos">${fmt(gerada)}</div>
+      <div class="kpi-sub">8,5% do faturamento com promoção</div>
     </div>
     <div class="kpi-card" style="border-top:4px solid var(--vermelho)">
       <div class="kpi-label">Verba Utilizada</div>
-      <div class="kpi-value neg">${fmt(totalUtilizado)}</div>
-      <div class="kpi-sub">Lançamentos GERENTE REGIONAL</div>
+      <div class="kpi-value neg">${fmt(utilizado)}</div>
+      <div class="kpi-sub">Créditos concedidos aos distribuidores</div>
     </div>
     <div class="kpi-card" style="border-top:4px solid var(--verde-mid)">
       <div class="kpi-label">Saldo Disponível</div>
-      <div class="kpi-value ${totalSaldo >= 0 ? 'pos' : 'neg'}">${fmt(totalSaldo)}</div>
+      <div class="kpi-value ${saldo >= 0 ? 'pos' : 'neg'}">${fmt(saldo)}</div>
       <div class="kpi-sub">Gerada – Utilizada</div>
     </div>
   `;
 }
 
-function renderVerbaTabRegional(fatPorRegional, lancGR) {
-  const dados = calcVerbaPorRegional(fatPorRegional, lancGR);
+function renderVerbaCategoria(dados, totalGerada, totalUtilizado, totalSaldo, filtroCategoria) {
+  const visiveis = filtroCategoria
+    ? dados.filter(d => d.categoria === filtroCategoria)
+    : dados;
 
-  const rows = dados.map(d => `
+  const fmtPct = p => (p * 100).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) + '%';
+
+  const rows = visiveis.map(d => {
+    const pctUso = d.gerada > 0 ? (d.utilizado / d.gerada) * 100 : 0;
+    return `
     <tr>
-      <td><strong>${d.regional}</strong></td>
-      <td class="val-pos">${fmt(d.fat_hk)}</td>
-      <td class="val-pos">${fmt(d.fat_om)}</td>
-      <td class="val-pos">${fmt(d.faturado)}</td>
+      <td><strong>${d.categoria}</strong></td>
+      <td style="color:var(--cinza-texto)">${fmtPct(d.pct)}</td>
       <td class="val-pos">${fmt(d.gerada)}</td>
       <td class="val-neg">${fmt(d.utilizado)}</td>
       <td class="${d.saldo >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.saldo)}</td>
       <td>
         <div style="background:var(--cinza-borda);border-radius:99px;height:8px;width:100px;overflow:hidden;display:inline-block;vertical-align:middle">
-          <div style="background:${d.saldo>=0?'var(--verde-mid)':'var(--vermelho)'};height:8px;width:${Math.min(100, d.gerada>0?(d.utilizado/d.gerada)*100:0).toFixed(0)}%"></div>
+          <div style="background:${d.saldo>=0?'var(--verde-mid)':'var(--vermelho)'};height:8px;width:${Math.min(100, pctUso).toFixed(0)}%"></div>
         </div>
-        <span style="font-size:.7rem;color:var(--cinza-texto);margin-left:6px">${d.gerada>0?((d.utilizado/d.gerada)*100).toFixed(1):0}%</span>
+        <span style="font-size:.7rem;color:var(--cinza-texto);margin-left:6px">${pctUso.toFixed(1)}%</span>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
-  document.getElementById('vc-table-regional').innerHTML = `
+  // Linha de total (só quando sem filtro de categoria)
+  let totalRow = '';
+  if (!filtroCategoria) {
+    const pctUsoTotal = totalGerada > 0 ? (totalUtilizado / totalGerada) * 100 : 0;
+    totalRow = `
+    <tr style="background:var(--verde-claro);font-weight:600">
+      <td><strong>TOTAL</strong></td>
+      <td style="color:var(--verde-escuro)">8,5%</td>
+      <td class="val-pos">${fmt(totalGerada)}</td>
+      <td class="val-neg">${fmt(totalUtilizado)}</td>
+      <td class="${totalSaldo >= 0 ? 'val-pos' : 'val-neg'}">${fmt(totalSaldo)}</td>
+      <td>
+        <div style="background:var(--cinza-borda);border-radius:99px;height:8px;width:100px;overflow:hidden;display:inline-block;vertical-align:middle">
+          <div style="background:${totalSaldo>=0?'var(--verde-escuro)':'var(--vermelho)'};height:8px;width:${Math.min(100, pctUsoTotal).toFixed(0)}%"></div>
+        </div>
+        <span style="font-size:.7rem;color:var(--cinza-texto);margin-left:6px">${pctUsoTotal.toFixed(1)}%</span>
+      </td>
+    </tr>`;
+  }
+
+  document.getElementById('vc-table-categoria').innerHTML = `
     <table>
       <thead><tr>
-        <th>Regional</th>
-        <th>Fat. Haskell</th>
-        <th>Fat. OhMy!</th>
-        <th>Fat. Total</th>
-        <th>Verba Gerada (0,7%)</th>
+        <th>Categoria</th>
+        <th>%</th>
+        <th>Verba Gerada</th>
         <th>Utilizado</th>
         <th>Saldo</th>
         <th>Uso</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum dado de faturamento.</td></tr>'}</tbody>
+      <tbody>${rows + totalRow || '<tr><td colspan="6" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum dado.</td></tr>'}</tbody>
     </table>`;
 }
 
-function renderVerbaHistorico(lancGR) {
-  const sorted = [...lancGR].sort((a,b) =>
+function renderVerbaGR(fatPorRegional, utilizadoGRPorRegional, filtroRegional) {
+  const pctGR = CATEGORIAS_VERBA['Gerente Regional'].pct;
+  const regionais = ['Centro Oeste & São Paulo', 'Sudeste & Sul', 'Norte & Nordeste'];
+
+  const visiveis = filtroRegional
+    ? regionais.filter(r => r === filtroRegional)
+    : regionais;
+
+  const rows = visiveis.map(reg => {
+    const fat       = fatPorRegional[reg] || 0;
+    const gerada    = fat * pctGR;
+    const utilizado = utilizadoGRPorRegional[reg] || 0;
+    const saldo     = gerada - utilizado;
+    const pctUso    = gerada > 0 ? (utilizado / gerada) * 100 : 0;
+    return `
+    <tr>
+      <td><strong>${reg}</strong></td>
+      <td class="val-pos">${fmt(fat)}</td>
+      <td class="val-pos">${fmt(gerada)}</td>
+      <td class="val-neg">${fmt(utilizado)}</td>
+      <td class="${saldo >= 0 ? 'val-pos' : 'val-neg'}">${fmt(saldo)}</td>
+      <td>
+        <div style="background:var(--cinza-borda);border-radius:99px;height:8px;width:100px;overflow:hidden;display:inline-block;vertical-align:middle">
+          <div style="background:${saldo>=0?'var(--verde-mid)':'var(--vermelho)'};height:8px;width:${Math.min(100, pctUso).toFixed(0)}%"></div>
+        </div>
+        <span style="font-size:.7rem;color:var(--cinza-texto);margin-left:6px">${pctUso.toFixed(1)}%</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('vc-table-gr').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Regional</th>
+        <th>Faturamento</th>
+        <th>Verba Gerada (0,5%)</th>
+        <th>Utilizado</th>
+        <th>Saldo</th>
+        <th>Uso</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum dado.</td></tr>'}</tbody>
+    </table>`;
+}
+
+function renderVerbaHistorico(lancVerba, filtros) {
+  const { regional, categoria, filtroCod, filtroNome } = filtros;
+
+  const filtrados = lancVerba.filter(r => {
+    if (regional  && r.regional !== regional) return false;
+    if (categoria && TIPO_PARA_CATEGORIA[r.tipo_credito] !== categoria) return false;
+    if (filtroCod  && !(r.cod_distribuidor || '').toLowerCase().includes(filtroCod)) return false;
+    if (filtroNome && !(r.distribuidor || '').toLowerCase().includes(filtroNome)) return false;
+    return true;
+  });
+
+  const sorted = [...filtrados].sort((a,b) =>
     (b.data_referencia||'').localeCompare(a.data_referencia||''));
 
   document.getElementById('vc-hist-info').textContent =
@@ -1103,6 +1190,8 @@ function renderVerbaHistorico(lancGR) {
     <tr>
       <td>${r.data_referencia ? r.data_referencia.slice(8,10)+'/'+r.data_referencia.slice(5,7)+'/'+r.data_referencia.slice(0,4) : '—'}</td>
       <td><span class="pill ${r.empresa==='Haskell'?'pill-hk':'pill-om'}">${r.empresa}</span></td>
+      <td>${TIPO_PARA_CATEGORIA[r.tipo_credito] || '—'}</td>
+      <td>${r.tipo_credito || '—'}</td>
       <td>${r.regional || '—'}</td>
       <td>${r.cod_distribuidor || '—'}</td>
       <td>${r.distribuidor || '—'}</td>
@@ -1114,145 +1203,21 @@ function renderVerbaHistorico(lancGR) {
   document.getElementById('vc-hist-table').innerHTML = `
     <table>
       <thead><tr>
-        <th>Data</th><th>Empresa</th><th>Regional</th>
+        <th>Data</th><th>Empresa</th><th>Categoria</th><th>Tipo</th><th>Regional</th>
         <th>Cód.</th><th>Distribuidor</th><th>Operação</th>
         <th>Valor</th><th>Observação</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum lançamento GERENTE REGIONAL.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="10" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum lançamento de verba.</td></tr>'}</tbody>
     </table>`;
 }
 
 document.getElementById('vc-aplicar').addEventListener('click', aplicarFiltrosVerba);
 document.getElementById('vc-limpar').addEventListener('click', () => {
   document.getElementById('vc-regional').value = '';
+  document.getElementById('vc-categoria').value = '';
   document.getElementById('vc-cod').value = '';
   document.getElementById('vc-nome').value = '';
   aplicarFiltrosVerba();
-});
-
-// ══════════════════════════════════════════════════════════════
-// ABA VERBA TRADE
-// ══════════════════════════════════════════════════════════════
-const VERBA_TRADE_PCT = 0.015;
-
-function aplicarFiltrosTrade() {
-  const filtroCod  = document.getElementById('vt-cod').value.trim().toLowerCase();
-  const filtroNome = document.getElementById('vt-nome').value.trim().toLowerCase();
-
-  // Faturamento total nacional (sem promoção) — soma de todas as regionais
-  const fatHK  = allFaturamento.reduce((s, r) => s + (r.fat_hk || 0), 0);
-  const fatOM  = allFaturamento.reduce((s, r) => s + (r.fat_om || 0), 0);
-  const fatTotal = fatHK + fatOM;
-  const gerada = fatTotal * VERBA_TRADE_PCT;
-
-  // Lançamentos TRADE
-  const lancTrade = semExcluidos(allLancamentos).filter(r => {
-    if (r.tipo_credito !== 'TRADE') return false;
-    if (filtroCod  && !(r.cod_distribuidor || '').toLowerCase().includes(filtroCod)) return false;
-    if (filtroNome && !(r.distribuidor || '').toLowerCase().includes(filtroNome)) return false;
-    return true;
-  });
-
-  const utilizado = Math.abs(
-    lancTrade.filter(r => r.operacao === 'Débito').reduce((s,r) => s + r.valor, 0)
-  );
-  const saldo = gerada - utilizado;
-
-  renderTradeKPIs(gerada, utilizado, saldo);
-  renderTradeTabela(fatHK, fatOM, fatTotal, gerada, utilizado, saldo);
-  renderTradeHistorico(lancTrade);
-}
-
-function renderTradeTabela(fatHK, fatOM, fatTotal, gerada, utilizado, saldo) {
-  const pct = gerada > 0 ? (utilizado/gerada)*100 : 0;
-
-  document.getElementById('vt-table-trade').innerHTML = `
-    <table>
-      <thead><tr>
-        <th>Trade</th>
-        <th>Fat. Haskell</th>
-        <th>Fat. OhMy!</th>
-        <th>Fat. Total</th>
-        <th>Verba Gerada (1,5%)</th>
-        <th>Utilizado</th>
-        <th>Saldo</th>
-        <th>Uso</th>
-      </tr></thead>
-      <tbody>
-        <tr>
-          <td><strong>Trade</strong></td>
-          <td class="val-pos">${fmt(fatHK)}</td>
-          <td class="val-pos">${fmt(fatOM)}</td>
-          <td class="val-pos">${fmt(fatTotal)}</td>
-          <td class="val-pos">${fmt(gerada)}</td>
-          <td class="val-neg">${fmt(utilizado)}</td>
-          <td class="${saldo >= 0 ? 'val-pos' : 'val-neg'}">${fmt(saldo)}</td>
-          <td>
-            <div style="background:var(--cinza-borda);border-radius:99px;height:8px;width:100px;overflow:hidden;display:inline-block;vertical-align:middle">
-              <div style="background:${saldo>=0?'var(--verde-mid)':'var(--vermelho)'};height:8px;width:${Math.min(100, pct).toFixed(0)}%"></div>
-            </div>
-            <span style="font-size:.7rem;color:var(--cinza-texto);margin-left:6px">${pct.toFixed(1)}%</span>
-          </td>
-        </tr>
-      </tbody>
-    </table>`;
-}
-
-function renderTradeKPIs(gerada, utilizado, saldo) {
-  document.getElementById('vt-kpi-row').innerHTML = `
-    <div class="kpi-card kpi-total">
-      <div class="kpi-label">Verba Gerada</div>
-      <div class="kpi-value pos">${fmt(gerada)}</div>
-      <div class="kpi-sub">1,5% do faturamento nacional</div>
-    </div>
-    <div class="kpi-card" style="border-top:4px solid var(--vermelho)">
-      <div class="kpi-label">Verba Utilizada</div>
-      <div class="kpi-value neg">${fmt(utilizado)}</div>
-      <div class="kpi-sub">Lançamentos TRADE</div>
-    </div>
-    <div class="kpi-card" style="border-top:4px solid var(--verde-mid)">
-      <div class="kpi-label">Saldo Disponível</div>
-      <div class="kpi-value ${saldo >= 0 ? 'pos' : 'neg'}">${fmt(saldo)}</div>
-      <div class="kpi-sub">Gerada – Utilizada</div>
-    </div>
-  `;
-}
-
-function renderTradeHistorico(lancTrade) {
-  const sorted = [...lancTrade].sort((a,b) =>
-    (b.data_referencia||'').localeCompare(a.data_referencia||''));
-
-  document.getElementById('vt-hist-info').textContent =
-    `${sorted.length.toLocaleString('pt-BR')} lançamentos`;
-
-  const rows = sorted.map(r => `
-    <tr>
-      <td>${r.data_referencia ? r.data_referencia.slice(8,10)+'/'+r.data_referencia.slice(5,7)+'/'+r.data_referencia.slice(0,4) : '—'}</td>
-      <td><span class="pill ${r.empresa==='Haskell'?'pill-hk':'pill-om'}">${r.empresa}</span></td>
-      <td>${r.regional || '—'}</td>
-      <td>${r.cod_distribuidor || '—'}</td>
-      <td>${r.distribuidor || '—'}</td>
-      <td><span class="pill ${r.operacao==='Crédito'?'pill-credito':'pill-debito'}">${r.operacao}</span></td>
-      <td class="${r.valor>=0?'val-pos':'val-neg'}">${fmt(r.valor)}</td>
-      <td style="color:var(--cinza-texto);max-width:220px;overflow:hidden;text-overflow:ellipsis">${r.observacao||'—'}</td>
-    </tr>`).join('');
-
-  document.getElementById('vt-hist-table').innerHTML = `
-    <table>
-      <thead><tr>
-        <th>Data</th><th>Empresa</th><th>Regional</th>
-        <th>Cód.</th><th>Distribuidor</th><th>Operação</th>
-        <th>Valor</th><th>Observação</th>
-      </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum lançamento TRADE.</td></tr>'}</tbody>
-    </table>`;
-}
-
-document.getElementById('vt-aplicar').addEventListener('click', aplicarFiltrosTrade);
-document.getElementById('vt-limpar').addEventListener('click', () => {
-  document.getElementById('vt-cod').value = '';
-  document.getElementById('vt-nome').value = '';
-  aplicarFiltrosTrade();
 });
 
 
