@@ -997,8 +997,8 @@ function aplicarFiltrosVerba() {
   const filtroCod  = document.getElementById('vc-cod').value.trim().toLowerCase();
   const filtroNome = document.getElementById('vc-nome').value.trim().toLowerCase();
 
-  // Faturamento nacional (COM promoção)
-  const fatNacional = allFaturamento.reduce((s, r) => s + (r.fat_hk_total || 0) + (r.fat_om_total || 0), 0);
+  // Faturamento nacional (com promoção — fonte: planilhas FM fechadas)
+  const fatNacional = allFaturamento.reduce((s, r) => s + (r.fat_hk || 0) + (r.fat_om || 0), 0);
 
   // Faturamento por regional (para Gerente Regional)
   const fatPorRegional = {};
@@ -1006,7 +1006,7 @@ function aplicarFiltrosVerba() {
     const reg = r.regional;
     if (!reg || REGIONAIS_EXCLUIDAS.has(reg) || reg === 'Sem Regional') return;
     if (!fatPorRegional[reg]) fatPorRegional[reg] = 0;
-    fatPorRegional[reg] += (r.fat_hk_total || 0) + (r.fat_om_total || 0);
+    fatPorRegional[reg] += (r.fat_hk || 0) + (r.fat_om || 0);
   });
 
   // Lançamentos de verba (créditos dos tipos mapeados)
