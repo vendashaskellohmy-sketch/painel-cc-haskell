@@ -386,8 +386,20 @@ tr:last-child td { border-bottom: none; }
       </select>
     </div>
     <div class="filter-group">
+      <label>Tipo de crédito</label>
+      <select id="s-tipo"><option value="">Todos</option></select>
+    </div>
+    <div class="filter-group">
       <label>Buscar distribuidor</label>
       <input type="text" id="s-busca" placeholder="Nome ou código…" />
+    </div>
+    <div class="filter-group">
+      <label>Período — início</label>
+      <input type="month" id="s-ini" />
+    </div>
+    <div class="filter-group">
+      <label>Período — fim</label>
+      <input type="month" id="s-fim" />
     </div>
     <button class="btn btn-primary" id="s-aplicar">Aplicar</button>
     <button class="btn btn-ghost"   id="s-limpar">Limpar</button>
@@ -448,7 +460,7 @@ tr:last-child td { border-bottom: none; }
   <!-- Tabela por categoria -->
   <div class="data-table-wrap" style="margin-bottom:24px;">
     <div class="table-toolbar">
-      <h3>Verba por Categoria <span style="font-size:.7rem;color:var(--cinza-texto);font-weight:400;font-style:italic;margin-left:6px">Verba comercial total: 8,5% do faturamento com promoção.</span></h3>
+      <h3>Verba por Categoria</h3>
     </div>
     <div class="scroll-x" id="vc-table-categoria">
       <div class="loading"><div class="spinner"></div></div>
@@ -474,6 +486,7 @@ tr:last-child td { border-bottom: none; }
     <div class="scroll-x" id="vc-hist-table">
       <div class="loading"><div class="spinner"></div></div>
     </div>
+    <div class="pagination" id="vc-hist-pagination"></div>
   </div>
 
 </div><!-- /tab-verba -->
@@ -571,7 +584,7 @@ function populateSelectores() {
 
   // tipos únicos (visão geral + histórico)
   const tipos = [...new Set(base.map(r => r.tipo_credito).filter(Boolean))].sort();
-  ['vg-tipo', 'h-tipo'].forEach(id => {
+  ['vg-tipo', 'h-tipo', 's-tipo'].forEach(id => {
     document.getElementById(id).innerHTML =
       '<option value="">Todos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
   });
@@ -824,30 +837,41 @@ function pageRange(cur, total) {
 function aplicarFiltrosSaldos() {
   const regional    = document.getElementById('s-regional').value;
   const filtroSaldo = document.getElementById('s-filtro-saldo').value;
+  const filtroTipo  = document.getElementById('s-tipo').value;
   const busca       = document.getElementById('s-busca').value.toLowerCase();
+  const ini         = document.getElementById('s-ini').value;
+  const fim         = document.getElementById('s-fim').value;
 
-  const base = semExcluidos(allLancamentos);
+  // Base: lançamentos filtrados por período e tipo
+  const base = semExcluidos(allLancamentos).filter(r => {
+    if (filtroTipo && r.tipo_credito !== filtroTipo) return false;
+    if (ini && ym(r.data_referencia) < ini) return false;
+    if (fim && ym(r.data_referencia) > fim) return false;
+    return true;
+  });
 
-  // Calcular saldos HK e OM por distribuidor numa única estrutura
+  // Agregar por distribuidor: saldo por tipo de crédito (carteira) + por empresa
   const byDist = {};
+  const totalPorTipo = {};
   base.forEach(r => {
     const k = r.cod_distribuidor;
     if (!byDist[k]) byDist[k] = {
       cod: k, nome: r.distribuidor, regional: r.regional,
-      saldo_hk: 0, cred_hk: 0, deb_hk: 0,
-      saldo_om: 0, cred_om: 0, deb_om: 0,
+      saldo_hk: 0, saldo_om: 0, tipos: {},
     };
-    const isHK = r.empresa === 'Haskell';
-    if (isHK) {
-      byDist[k].saldo_hk += r.valor;
-      if (r.operacao === 'Crédito') byDist[k].cred_hk += r.valor;
-      else byDist[k].deb_hk += r.valor;
-    } else {
-      byDist[k].saldo_om += r.valor;
-      if (r.operacao === 'Crédito') byDist[k].cred_om += r.valor;
-      else byDist[k].deb_om += r.valor;
-    }
+    const d = byDist[k];
+    if (r.empresa === 'Haskell') d.saldo_hk += r.valor;
+    else d.saldo_om += r.valor;
+
+    const t = r.tipo_credito || 'Sem tipo';
+    d.tipos[t] = (d.tipos[t] || 0) + r.valor;
+    totalPorTipo[t] = (totalPorTipo[t] || 0) + Math.abs(r.valor);
   });
+
+  // Colunas de carteira: tipos presentes, ordenados por relevância (maior movimento primeiro)
+  const tiposCols = Object.entries(totalPorTipo)
+    .sort((a, b) => b[1] - a[1])
+    .map(([t]) => t);
 
   let list = Object.values(byDist).filter(d => {
     if (regional && d.regional !== regional) return false;
@@ -859,41 +883,49 @@ function aplicarFiltrosSaldos() {
     return true;
   }).sort((a, b) => (b.saldo_hk + b.saldo_om) - (a.saldo_hk + a.saldo_om));
 
-  const rows = list.map(d => `
+  const thTipos = tiposCols.map(t =>
+    `<th style="font-size:.62rem">${t}</th>`).join('');
+
+  const rows = list.map(d => {
+    const saldoTotal = d.saldo_hk + d.saldo_om;
+    const tdTipos = tiposCols.map(t => {
+      const v = d.tipos[t] || 0;
+      if (Math.abs(v) < 0.005) return '<td style="color:var(--cinza-borda)">—</td>';
+      return `<td class="${v >= 0 ? 'val-pos' : 'val-neg'}">${fmt(v)}</td>`;
+    }).join('');
+    return `
     <tr>
       <td>${d.cod}</td>
       <td>${d.nome}</td>
       <td style="font-size:.72rem;color:var(--cinza-texto)">${d.regional || '—'}</td>
-      <td class="${d.cred_hk >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.cred_hk)}</td>
-      <td class="val-neg">${fmt(d.deb_hk)}</td>
-      <td class="${d.saldo_hk >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.saldo_hk)}</td>
-      <td class="${d.cred_om >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.cred_om)}</td>
-      <td class="val-neg">${fmt(d.deb_om)}</td>
+      ${tdTipos}
+      <td class="${d.saldo_hk >= 0 ? 'val-pos' : 'val-neg'}" style="border-left:2px solid var(--cinza-borda)">${fmt(d.saldo_hk)}</td>
       <td class="${d.saldo_om >= 0 ? 'val-pos' : 'val-neg'}">${fmt(d.saldo_om)}</td>
-    </tr>`).join('');
+      <td class="${saldoTotal >= 0 ? 'val-pos' : 'val-neg'}" style="font-weight:700">${fmt(saldoTotal)}</td>
+    </tr>`;
+  }).join('');
 
+  const nCols = 3 + tiposCols.length + 3;
   document.getElementById('s-unified-area').innerHTML = `
     <table>
       <thead>
         <tr>
-          <th rowspan="2">Cód.</th>
-          <th rowspan="2">Distribuidor</th>
-          <th rowspan="2">Regional</th>
-          <th colspan="3" style="text-align:center;background:var(--verde-claro);color:var(--verde-escuro)">Haskell</th>
-          <th colspan="3" style="text-align:center;background:var(--roxo-claro);color:var(--roxo)">OhMy!</th>
-        </tr>
-        <tr>
-          <th>Crédito</th><th>Débito</th><th>Saldo</th>
-          <th>Crédito</th><th>Débito</th><th>Saldo</th>
+          <th>Cód.</th>
+          <th>Distribuidor</th>
+          <th>Regional</th>
+          ${thTipos}
+          <th style="background:var(--verde-claro);color:var(--verde-escuro);border-left:2px solid var(--cinza-borda)">Saldo HK</th>
+          <th style="background:var(--roxo-claro);color:var(--roxo)">Saldo OM</th>
+          <th>Saldo Total</th>
         </tr>
       </thead>
-      <tbody>${rows || '<tr><td colspan="9" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum resultado.</td></tr>'}</tbody>
+      <tbody>${rows || `<tr><td colspan="${nCols}" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum resultado.</td></tr>`}</tbody>
     </table>`;
 
   const totHK = list.reduce((s,d) => s + d.saldo_hk, 0);
   const totOM = list.reduce((s,d) => s + d.saldo_om, 0);
   document.getElementById('s-total-info').textContent =
-    `${list.length} distribuidores · HK: ${fmt(totHK)} · OM: ${fmt(totOM)}`;
+    `${list.length} distribuidores · HK: ${fmt(totHK)} · OM: ${fmt(totOM)} · Total: ${fmt(totHK + totOM)}`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -929,7 +961,7 @@ document.getElementById('h-limpar').addEventListener('click', () => {
 
 document.getElementById('s-aplicar').addEventListener('click', aplicarFiltrosSaldos);
 document.getElementById('s-limpar').addEventListener('click', () => {
-  ['s-regional','s-filtro-saldo'].forEach(id => document.getElementById(id).value = '');
+  ['s-regional','s-filtro-saldo','s-tipo','s-ini','s-fim'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('s-busca').value = '';
   aplicarFiltrosSaldos();
 });
@@ -1174,6 +1206,10 @@ function renderVerbaGR(fatPorRegional, utilizadoGRPorRegional, filtroRegional) {
     </table>`;
 }
 
+let vcHistSorted = [];
+let vcHistPage   = 1;
+const VC_HIST_PAGE_SIZE = 50;
+
 function renderVerbaHistorico(lancVerba, filtros) {
   const { regional, categoria, filtroCod, filtroNome } = filtros;
 
@@ -1185,13 +1221,22 @@ function renderVerbaHistorico(lancVerba, filtros) {
     return true;
   });
 
-  const sorted = [...filtrados].sort((a,b) =>
+  vcHistSorted = [...filtrados].sort((a,b) =>
     (b.data_referencia||'').localeCompare(a.data_referencia||''));
+  vcHistPage = 1;
+  renderVerbaHistPage();
+}
+
+function renderVerbaHistPage() {
+  const total = vcHistSorted.length;
+  const pages = Math.max(1, Math.ceil(total / VC_HIST_PAGE_SIZE));
+  vcHistPage = Math.min(vcHistPage, pages);
+  const slice = vcHistSorted.slice((vcHistPage - 1) * VC_HIST_PAGE_SIZE, vcHistPage * VC_HIST_PAGE_SIZE);
 
   document.getElementById('vc-hist-info').textContent =
-    `${sorted.length.toLocaleString('pt-BR')} lançamentos`;
+    `${total.toLocaleString('pt-BR')} lançamentos  ·  página ${vcHistPage} de ${pages}`;
 
-  const rows = sorted.map(r => `
+  const rows = slice.map(r => `
     <tr>
       <td>${r.data_referencia ? r.data_referencia.slice(8,10)+'/'+r.data_referencia.slice(5,7)+'/'+r.data_referencia.slice(0,4) : '—'}</td>
       <td><span class="pill ${r.empresa==='Haskell'?'pill-hk':'pill-om'}">${r.empresa}</span></td>
@@ -1214,6 +1259,21 @@ function renderVerbaHistorico(lancVerba, filtros) {
       </tr></thead>
       <tbody>${rows || '<tr><td colspan="10" style="text-align:center;color:var(--cinza-texto);padding:30px">Nenhum lançamento de verba.</td></tr>'}</tbody>
     </table>`;
+
+  const nav = document.getElementById('vc-hist-pagination');
+  const btns = [];
+  btns.push(`<button class="page-btn" onclick="goVcHistPage(${vcHistPage-1})" ${vcHistPage<=1?'disabled':''}>‹ Anterior</button>`);
+  pageRange(vcHistPage, pages).forEach(p => {
+    if (p === '…') btns.push(`<span style="color:var(--cinza-texto)">…</span>`);
+    else btns.push(`<button class="page-btn ${p===vcHistPage?'active':''}" onclick="goVcHistPage(${p})">${p}</button>`);
+  });
+  btns.push(`<button class="page-btn" onclick="goVcHistPage(${vcHistPage+1})" ${vcHistPage>=pages?'disabled':''}>Próxima ›</button>`);
+  nav.innerHTML = btns.join('');
+}
+
+function goVcHistPage(p) {
+  vcHistPage = p;
+  renderVerbaHistPage();
 }
 
 document.getElementById('vc-aplicar').addEventListener('click', aplicarFiltrosVerba);
