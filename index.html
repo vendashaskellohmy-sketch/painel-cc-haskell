@@ -871,26 +871,42 @@ function aplicarFiltrosSaldos() {
     return true;
   });
 
-  // KPIs: total crédito, débito e saldo do conjunto filtrado
-  let totCred = 0, totDeb = 0;
+  // KPIs: crédito, débito e saldo separados por empresa
+  let credHK = 0, debHK = 0, credOM = 0, debOM = 0;
   base.forEach(r => {
-    if (r.operacao === 'Crédito') totCred += r.valor;
-    else totDeb += r.valor;
+    if (r.empresa === 'Haskell') {
+      if (r.operacao === 'Crédito') credHK += r.valor; else debHK += r.valor;
+    } else {
+      if (r.operacao === 'Crédito') credOM += r.valor; else debOM += r.valor;
+    }
   });
-  const totSaldo = totCred + totDeb;
+  const saldoHK = credHK + debHK;
+  const saldoOM = credOM + debOM;
 
   document.getElementById('s-kpi-row').innerHTML = `
     <div class="kpi-card" style="border-top:4px solid var(--verde-mid)">
-      <div class="kpi-label">Total de Créditos</div>
-      <div class="kpi-value pos">${fmt(totCred)}</div>
+      <div class="kpi-label">Créditos Haskell</div>
+      <div class="kpi-value pos">${fmt(credHK)}</div>
     </div>
     <div class="kpi-card" style="border-top:4px solid var(--vermelho)">
-      <div class="kpi-label">Total de Débitos</div>
-      <div class="kpi-value neg">${fmt(totDeb)}</div>
+      <div class="kpi-label">Débitos Haskell</div>
+      <div class="kpi-value neg">${fmt(debHK)}</div>
     </div>
-    <div class="kpi-card kpi-total">
-      <div class="kpi-label">Saldo</div>
-      <div class="kpi-value ${totSaldo >= 0 ? 'pos' : 'neg'}">${fmt(totSaldo)}</div>
+    <div class="kpi-card kpi-hk">
+      <div class="kpi-label">Saldo Haskell</div>
+      <div class="kpi-value ${saldoHK >= 0 ? 'pos' : 'neg'}">${fmt(saldoHK)}</div>
+    </div>
+    <div class="kpi-card" style="border-top:4px solid var(--roxo)">
+      <div class="kpi-label">Créditos OhMy!</div>
+      <div class="kpi-value om">${fmt(credOM)}</div>
+    </div>
+    <div class="kpi-card" style="border-top:4px solid var(--vermelho)">
+      <div class="kpi-label">Débitos OhMy!</div>
+      <div class="kpi-value neg">${fmt(debOM)}</div>
+    </div>
+    <div class="kpi-card kpi-om">
+      <div class="kpi-label">Saldo OhMy!</div>
+      <div class="kpi-value ${saldoOM >= 0 ? 'om' : 'neg'}">${fmt(saldoOM)}</div>
     </div>
   `;
 
