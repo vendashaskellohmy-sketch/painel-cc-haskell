@@ -401,8 +401,8 @@ tr:last-child td { border-bottom: none; }
       </select>
     </div>
     <div class="filter-group">
-      <label>Carteira</label>
-      <select id="s-carteira"><option value="">Todas</option></select>
+      <label>Tipo de crédito</label>
+      <select id="s-tipo"><option value="">Todos</option></select>
     </div>
     <div class="filter-group">
       <label>Período — início</label>
@@ -599,22 +599,12 @@ function onDataReady() {
 function populateSelectores() {
   const base = semExcluidos(allLancamentos);
 
-  // tipos únicos (visão geral + histórico)
+  // tipos únicos (visão geral + histórico + saldo por carteira)
   const tipos = [...new Set(base.map(r => r.tipo_credito).filter(Boolean))].sort();
-  ['vg-tipo', 'h-tipo'].forEach(id => {
+  ['vg-tipo', 'h-tipo', 's-tipo'].forEach(id => {
     document.getElementById(id).innerHTML =
       '<option value="">Todos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
   });
-
-  // carteiras únicas (tipo + empresa) para a aba Saldo por Carteira
-  const carteiras = [...new Set(base.map(r =>
-    (r.tipo_credito || 'Sem tipo') + '|' + r.empresa
-  ))].sort();
-  document.getElementById('s-carteira').innerHTML =
-    '<option value="">Todas</option>' + carteiras.map(k => {
-      const [t, e] = k.split('|');
-      return `<option value="${k}">${t} · ${e}</option>`;
-    }).join('');
 
   // distribuidores únicos (visão geral + histórico)
   const dists = [...new Map(base.map(r => [r.cod_distribuidor, r.distribuidor])).entries()]
@@ -873,7 +863,7 @@ function aplicarFiltrosSaldos() {
   const filtroNome = document.getElementById('s-nome').value.trim().toLowerCase();
   const regional   = document.getElementById('s-regional').value;
   const empresa    = document.getElementById('s-empresa').value;
-  const carteira   = document.getElementById('s-carteira').value;
+  const tipo       = document.getElementById('s-tipo').value;
   const ini        = document.getElementById('s-ini').value;
   const fim        = document.getElementById('s-fim').value;
 
@@ -883,10 +873,7 @@ function aplicarFiltrosSaldos() {
     if (filtroNome && !(r.distribuidor || '').toLowerCase().includes(filtroNome)) return false;
     if (regional   && r.regional !== regional) return false;
     if (empresa    && r.empresa !== empresa) return false;
-    if (carteira) {
-      const k = (r.tipo_credito || 'Sem tipo') + '|' + r.empresa;
-      if (k !== carteira) return false;
-    }
+    if (tipo       && (r.tipo_credito || 'Sem tipo') !== tipo) return false;
     return true;
   };
 
@@ -1062,7 +1049,7 @@ document.getElementById('h-limpar').addEventListener('click', () => {
 
 document.getElementById('s-aplicar').addEventListener('click', aplicarFiltrosSaldos);
 document.getElementById('s-limpar').addEventListener('click', () => {
-  ['s-cod','s-nome','s-regional','s-empresa','s-carteira','s-ini','s-fim'].forEach(id => document.getElementById(id).value = '');
+  ['s-cod','s-nome','s-regional','s-empresa','s-tipo','s-ini','s-fim'].forEach(id => document.getElementById(id).value = '');
   aplicarFiltrosSaldos();
 });
 
