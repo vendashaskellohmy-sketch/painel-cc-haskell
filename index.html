@@ -838,21 +838,27 @@ function aplicarFiltrosHist() {
     escopoFaturamento = 'Nacional (sem filtro de distribuidor/regional)';
   }
 
-  // ── Verba Comercial: "Gerada" agora usa o MESMO escopo do faturamento acima
-  // (distribuidor filtrado → % do faturamento dele; regional filtrado → % do
-  // faturamento da regional; sem filtro → % do faturamento nacional).
-  // "Utilizada" é recalculada respeitando os filtros atuais desta aba.
+  // ── Verba Comercial: "Gerada" usa o mesmo escopo do faturamento acima.
+  // "Utilizada" é recalculada respeitando os filtros desta aba, MAS restrita ao
+  // mesmo "ano da verba" usado na aba Verba Comercial — sem isso, créditos de
+  // anos anteriores (cc_lancamentos é histórico completo) vazariam para a soma
+  // enquanto Gerada/Faturamento ficam presos ao ano carregado em cc_faturamento.
+  const anoVerba = String(allFaturamento[0]?.ano || allFaturamentoDistribuidor[0]?.ano || new Date().getFullYear());
   const geradaHist = faturamentoTotal === null ? null : faturamentoTotal * VERBA_TOTAL_PCT;
   const utilizadaHist = filteredHist
-    .filter(r => r.operacao === 'Crédito' && TODOS_TIPOS_VERBA.includes(r.tipo_credito))
+    .filter(r =>
+      r.operacao === 'Crédito' &&
+      TODOS_TIPOS_VERBA.includes(r.tipo_credito) &&
+      (r.data_referencia || '').startsWith(anoVerba)
+    )
     .reduce((s, r) => s + r.valor, 0);
   const saldoHist = geradaHist === null ? null : geradaHist - utilizadaHist;
 
-  renderHistKPIs(faturamentoTotal, escopoFaturamento, geradaHist, utilizadaHist, saldoHist);
+  renderHistKPIs(faturamentoTotal, escopoFaturamento, geradaHist, utilizadaHist, saldoHist, anoVerba);
   renderHistTable();
 }
 
-function renderHistKPIs(faturamento, escopoFaturamento, gerada, utilizado, saldo) {
+function renderHistKPIs(faturamento, escopoFaturamento, gerada, utilizado, saldo, anoVerba) {
   document.getElementById('h-kpi-row').innerHTML = `
     <div class="kpi-card" style="border-top:4px solid var(--azul, #2563eb)">
       <div class="kpi-label">Faturamento</div>
@@ -867,7 +873,7 @@ function renderHistKPIs(faturamento, escopoFaturamento, gerada, utilizado, saldo
     <div class="kpi-card" style="border-top:4px solid var(--vermelho)">
       <div class="kpi-label">Verba Utilizada</div>
       <div class="kpi-value neg">${fmt(utilizado)}</div>
-      <div class="kpi-sub">Créditos de verba conforme filtros desta aba</div>
+      <div class="kpi-sub">Créditos de verba de ${anoVerba} conforme filtros desta aba</div>
     </div>
     <div class="kpi-card" style="border-top:4px solid var(--verde-mid)">
       <div class="kpi-label">Saldo Disponível</div>
