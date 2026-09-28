@@ -838,27 +838,31 @@ function aplicarFiltrosHist() {
     escopoFaturamento = 'Nacional (sem filtro de distribuidor/regional)';
   }
 
-  // ── Verba Comercial: "Gerada" usa o mesmo escopo do faturamento acima.
-  // "Utilizada" é recalculada respeitando os filtros desta aba, MAS restrita ao
-  // mesmo "ano da verba" usado na aba Verba Comercial — sem isso, créditos de
-  // anos anteriores (cc_lancamentos é histórico completo) vazariam para a soma
-  // enquanto Gerada/Faturamento ficam presos ao ano carregado em cc_faturamento.
+  // ── Verba Comercial: restrita à categoria "Gerente Regional" (0,5%).
+  // Motivo: o faturamento extraído de FM-02.006/038 não distingue tabela de preço
+  // normal vs. promocional. Categorias como MDs só devem incidir sobre a tabela
+  // normal — calculá-las sobre o faturamento total (normal+promo) inflaria a
+  // "Gerada" incorretamente. Gerente Regional é a única cujo 0,5% legitimamente
+  // incide sobre o faturamento total, então é a única computável com os dados
+  // disponíveis nesta aba.
+  const pctGR = CATEGORIAS_VERBA['Gerente Regional'].pct;
   const anoVerba = String(allFaturamento[0]?.ano || allFaturamentoDistribuidor[0]?.ano || new Date().getFullYear());
-  const geradaHist = faturamentoTotal === null ? null : faturamentoTotal * VERBA_TOTAL_PCT;
+  const geradaHist = faturamentoTotal === null ? null : faturamentoTotal * pctGR;
   const utilizadaHist = filteredHist
     .filter(r =>
       r.operacao === 'Crédito' &&
-      TODOS_TIPOS_VERBA.includes(r.tipo_credito) &&
+      TIPO_PARA_CATEGORIA[r.tipo_credito] === 'Gerente Regional' &&
       (r.data_referencia || '').startsWith(anoVerba)
     )
     .reduce((s, r) => s + r.valor, 0);
   const saldoHist = geradaHist === null ? null : geradaHist - utilizadaHist;
 
-  renderHistKPIs(faturamentoTotal, escopoFaturamento, geradaHist, utilizadaHist, saldoHist, anoVerba);
+  renderHistKPIs(faturamentoTotal, escopoFaturamento, geradaHist, utilizadaHist, saldoHist, anoVerba, pctGR);
   renderHistTable();
 }
 
-function renderHistKPIs(faturamento, escopoFaturamento, gerada, utilizado, saldo, anoVerba) {
+function renderHistKPIs(faturamento, escopoFaturamento, gerada, utilizado, saldo, anoVerba, pctGR) {
+  const pctTxt = (pctGR * 100).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) + '%';
   document.getElementById('h-kpi-row').innerHTML = `
     <div class="kpi-card" style="border-top:4px solid var(--azul, #2563eb)">
       <div class="kpi-label">Faturamento</div>
@@ -866,19 +870,19 @@ function renderHistKPIs(faturamento, escopoFaturamento, gerada, utilizado, saldo
       <div class="kpi-sub">${escopoFaturamento}</div>
     </div>
     <div class="kpi-card kpi-total">
-      <div class="kpi-label">Verba Comercial Gerada</div>
+      <div class="kpi-label">Verba Gerente Regional Gerada</div>
       <div class="kpi-value ${gerada === null ? 'neu' : 'pos'}">${gerada === null ? '—' : fmt(gerada)}</div>
-      <div class="kpi-sub">8,5% do faturamento do escopo filtrado (${escopoFaturamento})</div>
+      <div class="kpi-sub">${pctTxt} do faturamento do escopo filtrado (${escopoFaturamento})</div>
     </div>
     <div class="kpi-card" style="border-top:4px solid var(--vermelho)">
-      <div class="kpi-label">Verba Utilizada</div>
+      <div class="kpi-label">Verba Gerente Regional Utilizada</div>
       <div class="kpi-value neg">${fmt(utilizado)}</div>
-      <div class="kpi-sub">Créditos de verba de ${anoVerba} conforme filtros desta aba</div>
+      <div class="kpi-sub">Créditos "GERENTE REGIONAL" de ${anoVerba} conforme filtros desta aba</div>
     </div>
     <div class="kpi-card" style="border-top:4px solid var(--verde-mid)">
       <div class="kpi-label">Saldo Disponível</div>
       <div class="kpi-value ${saldo === null ? 'neu' : (saldo >= 0 ? 'pos' : 'neg')}">${saldo === null ? '—' : fmt(saldo)}</div>
-      <div class="kpi-sub">Gerada – Utilizada (mesmo escopo)</div>
+      <div class="kpi-sub">Gerada – Utilizada (Gerente Regional, mesmo escopo)</div>
     </div>
   `;
 }
